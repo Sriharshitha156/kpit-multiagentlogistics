@@ -47,7 +47,7 @@ RETRY_INTERVAL = 10         # ticks before re-auctioning a task that got no bids
 LOSS_PROBABILITY = 0.0      # chance that any single message is lost (raised in experiments)
 
 # ---------- Display (Pygame) ----------
-CELL_SIZE = 28              # pixels per grid cell
+CELL_SIZE = 26              # pixels per grid cell
 PANEL_WIDTH = 300           # width of the information panel on the right
 TICKS_PER_SECOND = 8        # simulation speed (UP/DOWN keys change it live)
 FPS = 60                    # screen refresh rate
