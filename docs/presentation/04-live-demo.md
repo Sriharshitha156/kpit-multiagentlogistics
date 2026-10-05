@@ -17,6 +17,16 @@ python main.py --split
 
 The left side starts with central B2; the right side is the decentralized auction fleet. In split mode, press `TAB` to switch the central baseline between B1 and B2.
 
+### Optional localhost packet demo
+
+The standard run uses the deterministic in-process bus. To send auction messages as actual UDP datagrams over loopback, run:
+
+```powershell
+python main.py --udp --nohelp
+```
+
+In Wireshark, capture on the Npcap Loopback Adapter and use the display filter `udp && ip.addr == 127.0.0.1`. Press `1` to create orders, then look for JSON UDP payloads containing message types such as `TASK_REQUEST`, `TASK_BID`, and `TASK_ACCEPT`. This mode still runs all agents in one process. Configured simulated message loss happens before a datagram is sent, so those intentionally dropped messages will not appear in the capture.
+
 ## Four-minute walkthrough
 
 ### 1. Orient the audience

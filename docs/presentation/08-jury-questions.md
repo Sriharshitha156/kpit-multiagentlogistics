@@ -32,7 +32,7 @@ The paired scalability batch tested 100 agents, 50 scheduled orders, 10 seeded f
 
 ## What if communication overhead is high?
 
-The bus counts generated transmissions and recipient deliveries, and supports configurable delay and message loss. In a five-seed sweep, 20% message loss produced about 13% conflicting accepted auctions; at 50% loss, about 54 auctions per run had no observed accept claim. The latter also explains why the conflict fraction falls slightly at 50%: fewer auctions reached any acceptance. The bus does not model bandwidth, congestion, or actual network resource limits, and its global audit cannot prove what each agent received. This is a first-order simulation study, not a distributed-consensus guarantee.
+The in-process bus counts generated transmissions and recipient deliveries, and supports configurable delay and message loss. An optional `--udp` mode sends the serialized messages over localhost UDP, where Wireshark can capture them. In a five-seed sweep, 20% simulated message loss produced about 13% conflicting accepted auctions; at 50% loss, about 54 auctions per run had no observed accept claim. The lower conflict fraction at 50% reflects fewer auctions reaching acceptance. Neither transport models bandwidth, congestion, or real network partitions, and the global audit cannot prove what each agent received. This is not a distributed-consensus guarantee.
 
 ## What proves the approach works?
 
@@ -52,4 +52,4 @@ Single-process simulated communications, no collision avoidance/congestion, perm
 
 ## What is the next credible improvement?
 
-Measure how often agents disagree about auction winners as message loss rises, and add bandwidth or charger-capacity limits if those are central to the intended claim. Consider sockets only if a real networked deployment is a project requirement; the current simulator intentionally uses a deterministic in-process bus.
+If separate-process deployment becomes a requirement, move from the optional localhost demo to isolated agent processes and test packet loss, timing, and recovery there. For the current simulator, the next useful improvement is to model bandwidth or charger capacity if those are central to the claim.

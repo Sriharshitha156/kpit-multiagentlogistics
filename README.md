@@ -17,6 +17,7 @@ This project is a **simulation**, not a deployed delivery service or a model tra
 - Rush-hour order bursts, blocked roads, and vehicle failures can be triggered during a run.
 - Heartbeats help agents detect failed peers; the surviving fleet can reclaim orphaned deliveries.
 - Split-screen mode compares the auction fleet with central dispatch strategies (nearest idle and a battery-aware dispatcher).
+- Optional localhost UDP mode sends real JSON datagrams for packet-capture demos; agents still run in one process.
 - The window displays the map, vehicles and battery levels, active orders, performance metrics, and a plain-English event feed.
 
 ## A presentation-ready example
@@ -33,8 +34,11 @@ The simulator records completed, waiting, and lost deliveries; average delivery 
 pip install -r requirements.txt
 python main.py            # interactive window
 python main.py --split    # compare central dispatch and auction side by side
+python main.py --udp      # send auction messages over localhost UDP
 python -m unittest discover -s tests
 ```
+
+For Wireshark, capture on the Npcap Loopback Adapter with display filter `udp && ip.addr == 127.0.0.1`. The regular in-process transport remains the default and is used for repeatable experiment suites.
 
 ## Controls
 
@@ -55,8 +59,8 @@ Results are written to `results/<suite>/` as run data, summaries, settings, and 
 
 ## Assumptions and current limitations
 
-Vehicle speed, battery capacity and consumption, charging rate, and order arrival rate are configurable simulation assumptions; they are not calibrated against real fleet or city data. The model has task priorities but no delivery deadlines. The network is simulated inside one program. Vehicles may share a map cell, failures are permanent, chargers have unlimited capacity, and a failed vehicle's parcel location is approximated using its last heartbeat position. The central baselines do not include communication costs. These limits should be stated when presenting results.
+Vehicle speed, battery capacity and consumption, charging rate, and order arrival rate are configurable simulation assumptions; they are not calibrated against real fleet or city data. The model has task priorities but no delivery deadlines. Agents, world, and renderer run in one program. The default network is simulated; `--udp` sends optional loopback datagrams but does not separate agents into processes or model a production network. Vehicles may share a map cell, failures are permanent, chargers have unlimited capacity, and a failed vehicle's parcel location is approximated using its last heartbeat position. The central baselines do not include communication costs. These limits should be stated when presenting results.
 
 ## Main files
 
-`config.py` (simulation settings) | `agent.py` (bidding, battery, heartbeat, recovery) | `baseline_dispatcher.py` (central baselines) | `simulation.py` (tick loop) | `environment.py` and `pathfinding.py` (grid and A*) | `metrics.py` and `experiments/` (results) | `main.py` (Pygame demo) | `tests/`
+`config.py` (simulation settings) | `agent.py` (bidding, battery, heartbeat, recovery) | `baseline_dispatcher.py` (central baselines) | `simulation.py` (tick loop) | `environment.py` and `pathfinding.py` (grid and A*) | `communication.py` / `socket_bus.py` (in-process and optional UDP messages) | `metrics.py` and `experiments/` (results) | `main.py` (Pygame demo) | `tests/`

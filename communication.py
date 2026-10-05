@@ -12,14 +12,14 @@ from collections import deque
 
 import config
 
-# Message types (the ones marked "later" are used in Phase 9)
+# Message types used by task allocation, delivery reporting and failure recovery.
 TASK_REQUEST = "TASK_REQUEST"          # order desk -> everyone: "who wants this delivery?"
 TASK_BID = "TASK_BID"                  # agent -> everyone: "I can do it at this cost"
 TASK_ACCEPT = "TASK_ACCEPT"            # winner -> everyone: "I own this task"
 DELIVERY_COMPLETE = "DELIVERY_COMPLETE"
-TASK_REASSIGN = "TASK_REASSIGN"        # later
-HEARTBEAT = "HEARTBEAT"                # later
-AGENT_FAILURE = "AGENT_FAILURE"        # later
+TASK_REASSIGN = "TASK_REASSIGN"        # peer announces a new auction epoch for orphaned work
+HEARTBEAT = "HEARTBEAT"                # agent reports that it is alive
+AGENT_FAILURE = "AGENT_FAILURE"        # peer reports its failure suspicion
 
 BROADCAST = "BROADCAST"                # receiver value meaning "send to everyone"
 DESK = "DESK"                          # sender id of the order desk (it is not an agent)

@@ -9,8 +9,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
 import scenarios
-from communication import describe_message, HEARTBEAT, TASK_BID
+from communication import (BROADCAST, DESK, describe_message, HEARTBEAT, TASK_BID, TASK_REQUEST)
+from socket_bus import LocalUdpMessageBus
 from simulation import Simulation
+from task import TaskInfo
 
 
 class TestPresets(unittest.TestCase):
@@ -70,6 +72,35 @@ class TestMessageFeed(unittest.TestCase):
     def test_describe_message_is_readable(self):
         text = describe_message(TASK_BID, 3, {"task_id": 7, "epoch": 1, "cost": 14.25})
         self.assertEqual(text, "A3 -> ALL  TASK_BID  #7 cost 14.2")
+
+    def test_local_udp_bus_transmits_and_reconstructs_task_messages(self):
+        bus = LocalUdpMessageBus(seed=8, agent_ids=[1, 2])
+        try:
+            bus.set_alive([1, 2])
+            task = TaskInfo(17, (2, 3), (8, 9), 3, 4)
+            bus.send(TASK_REQUEST, DESK, BROADCAST, 4, {"task": task, "epoch": 1})
+            bus.deliver(5)
+            first = bus.collect(1)[0]
+            second = bus.collect(2)[0]
+            self.assertEqual(first.msg_type, TASK_REQUEST)
+            self.assertEqual(first.payload["task"].pickup, (2, 3))
+            self.assertEqual(second.payload["task"].destination, (8, 9))
+            self.assertNotEqual(bus.udp_endpoints[1], bus.udp_endpoints[2])
+            self.assertEqual((bus.messages_sent, bus.messages_delivered), (1, 2))
+        finally:
+            bus.close()
+
+    def test_full_auction_simulation_can_use_local_udp(self):
+        config.TASK_SPAWN_PROBABILITY = 0.0
+        sim = Simulation(seed=12, num_agents=5, strategy="AUCTION", transport="udp")
+        try:
+            sim.new_task()
+            for _ in range(80):
+                sim.step()
+            self.assertGreater(sim.bus.messages_delivered, 0)
+            self.assertGreater(sim.bus.sent_by_type.get(TASK_BID, 0), 0)
+        finally:
+            sim.close()
 
 
 if __name__ == "__main__":

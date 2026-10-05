@@ -530,13 +530,17 @@ def draw_help(screen, fonts):
 class App:
     """Holds the state of the window: the simulation(s), the speed and the buttons."""
 
-    def __init__(self, split=False, show_help=True):
+    def __init__(self, split=False, show_help=True, transport="inprocess"):
         pygame.init()
-        pygame.display.set_caption("Smart Multi-Agent Delivery Simulator")
+        caption = "Smart Multi-Agent Delivery Simulator"
+        if transport == "udp":
+            caption += " - localhost UDP"
+        pygame.display.set_caption(caption)
         self.fonts = (pygame.font.Font(None, 20), pygame.font.Font(None, 17), pygame.font.Font(None, 24),
                       pygame.font.Font(None, 15))
         self.button_font = pygame.font.Font(None, 18)
         self.split = split
+        self.transport = transport
         self.seed = config.RANDOM_SEED
         self.single_strategy = config.STRATEGY
         self.left_strategy = "B2"
@@ -557,9 +561,12 @@ class App:
         return pygame.display.set_mode(SPLIT_SIZE if self.split else SINGLE_SIZE)
 
     def _new_sims(self):
+        for sim in getattr(self, "sims", []):
+            sim.close()
         if self.split:
-            return [Simulation(self.seed, strategy=self.left_strategy), Simulation(self.seed, strategy="AUCTION")]
-        return [Simulation(self.seed, strategy=self.single_strategy)]
+            return [Simulation(self.seed, strategy=self.left_strategy, transport=self.transport),
+                    Simulation(self.seed, strategy="AUCTION", transport=self.transport)]
+        return [Simulation(self.seed, strategy=self.single_strategy, transport=self.transport)]
 
     def views(self):
         return list(split_views()) if self.split else [single_view()]
@@ -773,12 +780,16 @@ class App:
             frames += 1
             if max_frames is not None and frames >= max_frames:
                 break
+        for sim in self.sims:
+            sim.close()
         pygame.quit()
 
 
 def main():
     max_frames = int(sys.argv[sys.argv.index("--frames") + 1]) if "--frames" in sys.argv else None
-    App(split="--split" in sys.argv, show_help="--nohelp" not in sys.argv).run(max_frames)
+    transport = "udp" if "--udp" in sys.argv else "inprocess"
+    App(split="--split" in sys.argv, show_help="--nohelp" not in sys.argv,
+        transport=transport).run(max_frames)
 
 
 if __name__ == "__main__":

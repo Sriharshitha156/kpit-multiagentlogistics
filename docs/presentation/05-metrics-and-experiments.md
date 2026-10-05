@@ -20,7 +20,7 @@
 | Average reassignment time | Mean of failure tick to new-owner assignment tick for recorded recoveries | Simulation ticks |
 | Average detection latency | First recorded peer-detection tick minus true failure tick | Simulation ticks; first detection only per failed agent |
 | False suspicions | Count of false peer-failure declarations recorded by agents | Declarations, not a probability/rate |
-| Messages sent | Bus transmissions | A broadcast counts once |
+| Messages sent | Logical bus transmissions | A broadcast counts once in simulator metrics; UDP mode emits one datagram per recipient |
 | Messages delivered | Recipient copies delivered by the bus | Broadcast counts once per recipient; lost messages excluded |
 | Messages per completed task | Sent transmissions divided by completed deliveries | Undefined when nothing completed |
 | Conflicted auctions | Auction records with accept claims from more than one agent | Based on transmitted claims observed by the simulator-wide audit log |

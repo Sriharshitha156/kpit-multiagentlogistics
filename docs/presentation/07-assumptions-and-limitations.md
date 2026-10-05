@@ -12,8 +12,8 @@ State these plainly if asked what the simulator proves.
 
 ## System limitations
 
-- Agents, bus, world, and renderer all run in one Python process. There are no sockets, real vehicle radios, or Wireshark-capturable protocol packets.
-- The bus can model message delay and independent message loss, but not bandwidth limits, congestion, authentication, or real network partitions.
+- Agents, world, and renderer still run in one Python process. The optional `--udp` mode sends actual localhost UDP datagrams, but it does not create independent agent processes or real vehicle radios.
+- The default bus models delay and independent message loss. UDP mode can be captured on loopback, but neither mode models bandwidth limits, congestion, authentication, or real network partitions. Configured simulated message loss is applied before UDP transmission.
 - Obstacle changes are delivered directly to agents as world events. The map generator and road-blocking controls preserve connectivity.
 - Vehicles can share a cell; there is no collision avoidance or traffic congestion model.
 - Failures are permanent. Chargers have unlimited capacity.
@@ -28,5 +28,5 @@ State these plainly if asked what the simulator proves.
 - “Always beats a central dispatcher.”
 - “Scales efficiently to real fleets” based on the single-host 100-agent simulation. Current evidence is three seeds, 50 orders, 10 failures, and 600 ticks; it reports runtime and message counts only for that setup.
 - “Cloud failure has been tested” as a deployed cloud outage; only the simulated dispatcher can be toggled offline.
-- “The agents communicate over a real network.”
+- “The agents run as separate processes over a vehicle network.” The optional UDP mode only uses localhost sockets inside the same application process.
 - “Deliveries meet a 90-minute deadline” or “on-time rate” because deadlines are not implemented.

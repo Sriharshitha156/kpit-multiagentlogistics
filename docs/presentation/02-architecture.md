@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-  Desk[Order desk] -->|TASK_REQUEST| Bus[In-process message bus]
+  Desk[Order desk] -->|TASK_REQUEST| Bus["Message transport: in-process or UDP loopback"]
   Bus --> A1[Agent 1]
   Bus --> A2[Agent 2]
   Bus --> AN[Other agents]
@@ -27,7 +27,8 @@ flowchart LR
 
 - `simulation.py`: advances ticks, creates orders, delivers bus messages, and updates agents in shuffled order.
 - `agent.py`: local state, bid calculation, auction ledger, task queue, heartbeats, failure detection, recovery, charging, and movement.
-- `communication.py`: simulated delay/loss, message delivery, transmission counters, and the auction audit trail shown by the UI.
+- `communication.py`: default in-process delivery, simulated delay/loss, transmission counters, and the auction audit trail shown by the UI.
+- `socket_bus.py`: optional localhost UDP transport. It serializes the same messages into datagrams so they can be inspected on the loopback network interface; agents and the simulation still run in one Python process.
 - `environment.py`: true grid, obstacles, chargers, task lifecycle, and ground-truth event recording.
 - `pathfinding.py`: A* route search on the grid.
 - `baseline_dispatcher.py`: intentionally centralized nearest-idle and battery-aware strategies.
@@ -41,6 +42,10 @@ In auction mode, each agent calculates its own bid and independently resolves th
 The order desk announces a new task, and the environment owns ground truth for the map and task status. Obstacle changes are delivered directly to each agent as simulation events. The simulated bus is an in-process component, not a real network.
 
 The B1 and B2 strategies are central by design: the dispatcher reads agent state and assigns tasks. B2 also sees failures immediately. They are comparison baselines, not decentralized modes.
+
+## Optional localhost transport
+
+The normal simulator and all experiment suites use the deterministic in-process bus. Launching `python main.py --udp` selects a UDP loopback transport for auction messages. Each simulated agent has a local UDP endpoint; the bus still controls logical tick delivery, message-loss settings, and metrics. This makes actual localhost datagrams visible to packet-capture tools, but it does not turn the agents into separate processes or model a production network.
 
 ## Message purposes
 

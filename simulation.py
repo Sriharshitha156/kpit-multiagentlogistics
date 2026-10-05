@@ -12,13 +12,17 @@ from agent import Agent
 from baseline_dispatcher import CentralDispatcherB1, CentralDispatcherB2
 from communication import BROADCAST, DESK, MessageBus, TASK_REQUEST
 from environment import Environment
+from socket_bus import LocalUdpMessageBus
 
 
 class Simulation:
     """Holds the environment, agents and (for baselines) the dispatcher."""
 
     def __init__(self, seed=config.RANDOM_SEED, num_agents=config.NUM_AGENTS, strategy=None,
-                 task_schedule=None, initial_battery=None):
+                 task_schedule=None, initial_battery=None, transport="inprocess"):
+        if transport not in ("inprocess", "udp"):
+            raise ValueError("transport must be 'inprocess' or 'udp'")
+        self.transport = transport
         self.strategy = strategy or config.STRATEGY
         self.env = Environment(seed)
         # A schedule is used by paired experiments; normal interactive runs keep
@@ -27,7 +31,12 @@ class Simulation:
         self._scheduled_task_index = 0
         self.tick = 0
         # Only the decentralized strategy needs a network.
-        self.bus = MessageBus(seed + 1000) if self.strategy == "AUCTION" else None
+        self.bus = None
+        if self.strategy == "AUCTION":
+            if transport == "udp":
+                self.bus = LocalUdpMessageBus(seed + 1000, range(1, num_agents + 1))
+            else:
+                self.bus = MessageBus(seed + 1000)
         self.agents = []
         for i in range(num_agents):
             start = self.env.random_free_cell()
@@ -145,3 +154,9 @@ class Simulation:
 
     def failed_count(self):
         return len(self.agents) - self.alive_count()
+
+    def close(self):
+        """Release optional transport resources after this simulation is discarded."""
+        close_bus = getattr(self.bus, "close", None)
+        if close_bus is not None:
+            close_bus()
