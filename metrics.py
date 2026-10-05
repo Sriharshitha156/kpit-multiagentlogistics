@@ -45,6 +45,8 @@ def summarize(sim):
         "waiting": len(waiting),
         "average_delivery_time": average_delivery_time,
         "total_distance": sum(a.distance_travelled for a in sim.agents),
+        "energy_used": sum(a.energy_used for a in sim.agents),
+        "energy_charged": sum(a.energy_charged for a in sim.agents),
         "failed_agents": len(failed_ids),
         "battery_failures": sum(1 for a in sim.agents if a.fail_reason == "BATTERY"),
         "utilization": (busy_ticks / alive_ticks) if alive_ticks else 0.0,

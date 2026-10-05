@@ -12,7 +12,7 @@ In the recent three-seed stress run, high demand averaged 49% completion for B1,
 
 ## How is battery considered?
 
-Battery is a feasibility gate with a configurable safety margin. It is not directly added as a continuous term in the bid score. A low-battery idle agent heads to a charger. Charging stations have unlimited capacity in this model.
+Battery is a feasibility gate with a configurable safety margin. It is not directly added as a continuous term in the bid score. A low-battery idle agent heads to a charger. The simulator now records movement energy used and energy added at chargers, in battery units; these are not calibrated to kilowatt-hours. Charging stations have unlimited capacity in this model.
 
 ## How does priority affect allocation?
 
@@ -36,7 +36,7 @@ The in-process bus counts generated transmissions and recipient deliveries, and 
 
 ## What proves the approach works?
 
-The code includes 63 automated tests for bidding, winner selection, A*, recovery, UI behavior, and experiment repeatability. The paired stress batch has 63 simulator runs (three strategies × seven cases × three seeds), and the scale batch has 99 runs (three strategies × eleven settings × three seeds). The metrics come from simulator state, not hand-entered results. These demonstrate software behavior under the stated assumptions; they do not prove field performance. Report the protocol, seeds, run horizon, and variability.
+The code includes 67 automated tests for bidding, winner selection, A*, recovery, UI behavior, UDP message transfer, and experiment repeatability. The paired stress batch has 63 simulator runs (three strategies × seven cases × three seeds), the scale batch has 99 runs, the auction consistency sweep has 30 runs, and the energy batch has 36 runs. The metrics come from simulator state, not hand-entered results. These demonstrate software behavior under the stated assumptions; they do not prove field performance. Report the protocol, seeds, run horizon, and variability.
 
 ## What is genuinely new here?
 

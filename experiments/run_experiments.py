@@ -37,6 +37,7 @@ SWEEP_SEEDS = list(range(2001, 2006))    # tuning seeds, used only for the timeo
 QUICK_SEEDS = [1, 2]
 SCALE_SEEDS = [3001, 3002, 3003]
 CONSENSUS_SEEDS = [4001, 4002, 4003, 4004, 4005]
+ENERGY_SEEDS = [5001, 5002, 5003]
 
 METRICS = ["created", "completed", "completion_rate", "lost", "waiting", "avg_delivery", "reassigned",
            "avg_reassign_time", "avg_detection_latency", "false_suspicions", "battery_failures",
@@ -44,6 +45,7 @@ METRICS = ["created", "completed", "completion_rate", "lost", "waiting", "avg_de
            "heartbeat_sent", "msgs_per_completed"]
 AUCTION_AUDIT_METRICS = ["accepted_auctions", "conflicted_auctions", "unaccepted_auctions",
                          "auction_conflict_rate"]
+ENERGY_METRICS = ["energy_used", "energy_charged", "energy_per_completed_delivery"]
 KEY_FIELDS = ["experiment", "group", "x", "strategy", "seed"]
 
 
@@ -122,6 +124,17 @@ def consensus_experiments():
                 strategies=["AUCTION"])]
 
 
+def energy_experiments():
+    cases = {
+        "Normal": lambda: scenario(num_agents=8, task_count=50),
+        "High demand": lambda: scenario(num_agents=8, task_count=100),
+        "Low starting battery": lambda: scenario(num_agents=8, task_count=50, initial_battery=35),
+        "Emergency priority": lambda: scenario(num_agents=8, task_count=50, task_priority=3),
+    }
+    return [exp("energy_scenarios", "scenario", list(cases),
+                lambda label, group: cases[label]())]
+
+
 SUITES = {"main": (main_experiments, MAIN_SEEDS, 1500),
           "sweep": (sweep_experiments, SWEEP_SEEDS, 1500),
           "quick": (quick_experiments, QUICK_SEEDS, 500),
@@ -133,7 +146,8 @@ SUITES = {"main": (main_experiments, MAIN_SEEDS, 1500),
           # Fresh folder for a clean, reviewable result set, separate from prior runs.
           "paired-scale-clean": (scale_experiments, SCALE_SEEDS, 600),
           "paired-stress": (stress_experiments, SCALE_SEEDS, 600),
-          "paired-consensus": (consensus_experiments, CONSENSUS_SEEDS, 600)}
+          "paired-consensus": (consensus_experiments, CONSENSUS_SEEDS, 600),
+          "paired-energy": (energy_experiments, ENERGY_SEEDS, 600)}
 
 
 def make_jobs(experiments, seeds):
@@ -221,6 +235,11 @@ def run_job(job, ticks):
     if job.get("track_auction_audit"):
         for metric in AUCTION_AUDIT_METRICS:
             row[metric] = m[metric]
+    if job.get("track_energy"):
+        row["energy_used"] = m["energy_used"]
+        row["energy_charged"] = m["energy_charged"]
+        row["energy_per_completed_delivery"] = (m["energy_used"] / m["completed"]
+                                                if m["completed"] else None)
     return row
 
 
@@ -278,6 +297,8 @@ def main():
                 job["track_runtime"] = True
             if args.suite == "paired-consensus":
                 job["track_auction_audit"] = True
+            if args.suite == "paired-energy":
+                job["track_energy"] = True
     done = {job_key(r) for r in read_rows(raw_path)}
     todo = [j for j in jobs if job_key(j) not in done]
     print("suite=%s  ticks=%d  seeds=%d  runs: %d total, %d already done" % (args.suite, ticks, len(seeds), len(jobs), len(done)))
@@ -291,7 +312,8 @@ def main():
                    "config": {k: getattr(config, k) for k in dir(config) if k.isupper() and k != "PRIORITY_FACTOR"}}, f, indent=2)
 
     report_metrics = (METRICS + (["compute_seconds"] if args.suite.startswith("paired-scale") else [])
-                      + (AUCTION_AUDIT_METRICS if args.suite == "paired-consensus" else []))
+                      + (AUCTION_AUDIT_METRICS if args.suite == "paired-consensus" else [])
+                      + (ENERGY_METRICS if args.suite == "paired-energy" else []))
     fields = KEY_FIELDS + report_metrics
     new_file = not os.path.exists(raw_path)
     start = time.time()

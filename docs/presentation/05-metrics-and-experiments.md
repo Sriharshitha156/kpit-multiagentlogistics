@@ -10,6 +10,8 @@
 | Lost | Assigned/picked-up tasks whose current owner has failed | Current snapshot, not all failures over time |
 | Average delivery time | Mean of `completed_tick - created_tick` for completed tasks | Simulation ticks; excludes unfinished tasks |
 | Total distance | Sum of agent movement steps | Grid cells |
+| Battery energy used | Sum of actual energy deducted during movement | Battery units; movement steps × `ENERGY_PER_CELL` under the current model |
+| Battery energy charged | Sum of actual energy added at charging stations | Battery units; capped by battery capacity |
 | Failed agents | Agents currently in `FAILED` state | Agents |
 | Battery failures | Failed agents whose failure reason is `BATTERY` | Agents |
 | Utilization | Sum of busy ticks divided by sum of alive ticks | Ratio; busy means pickup travel or delivery, not charging/idle |
@@ -27,7 +29,7 @@
 | Unaccepted auctions | Auction records with no accept claim by end of run | Includes auctions that may still be pending at the end |
 | Auction conflict rate | Conflicted auctions divided by auctions with at least one accept claim | Not the fraction of agents that disagreed; audit sees sends, not each agent's inbox |
 
-On-time/late percentage, deadlines, battery consumption, and recovery distance against a no-failure counterfactual are **not** currently reported. Computation time is reported only by the `paired-scale` suite.
+On-time/late percentage, deadlines, and recovery distance against a no-failure counterfactual are **not** currently reported. Battery energy is measured in abstract model units, not calibrated electrical units. Computation time is reported only by the `paired-scale` suites.
 
 ## Baselines
 
@@ -101,6 +103,21 @@ Each point uses 12 agents, 60 paired orders, two failures, 600 ticks, and one of
 The completed 30-run batch showed 0% conflicting accepted auctions at 0% message loss, about 13% at 20% loss, and about 20% at 35% loss. At 50% loss the conflict rate was about 17%, but auctions with no observed accept rose to about 54 per run (from 3 with no loss). That lower conflict rate at 50% is not an improvement: fewer auctions got any accept claim. Completion also fell from about 94% to 87%. These are five-seed simulation averages, not a consensus guarantee.
 
 ![Auction agreement under message loss](figures/paired-auction-consistency.png)
+
+### Battery energy check
+
+Run paired energy comparisons across normal demand, high demand, low starting charge, and emergency-priority orders:
+
+```powershell
+python experiments/run_experiments.py --suite paired-energy
+python experiments/make_charts.py --suite paired-energy
+```
+
+The suite uses three seeds, 600 ticks, and identical scheduled requests for all three strategies in each scenario. It reports total energy used, energy returned through charging, energy used per completed delivery, and completed orders. Energy values are simulation units, not kilowatt-hours; the vehicle model has no real battery calibration.
+
+One completed batch contains 36 runs (3 strategies × 4 scenarios × 3 seeds). Read energy totals together with completed orders: a strategy that stops vehicles early can use less energy simply because it did less delivery work.
+
+![Measured energy use and charging](figures/paired-energy-scenarios.png)
 
 ### What “paired requests” means
 

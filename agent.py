@@ -66,6 +66,8 @@ class Agent:
         self.wander_target = None           # only used if WANDER_WHEN_IDLE is True
         self.charger_target = None
         self.distance_travelled = 0
+        self.energy_used = 0.0
+        self.energy_charged = 0.0
         self.fail_reason = None
         # counters used by the metrics
         self.tasks_completed = 0
@@ -450,7 +452,9 @@ class Agent:
 
     def _charge(self):
         """Gain battery each tick; go back to IDLE when charged enough."""
+        previous = self.battery
         self.battery = min(config.BATTERY_MAX, self.battery + config.CHARGE_RATE)
+        self.energy_charged += self.battery - previous
         if self.battery >= config.CHARGE_TARGET:
             self.status = IDLE
 
@@ -473,4 +477,5 @@ class Agent:
         """Actually move, paying battery for the step."""
         self.position = new_cell
         self.battery -= config.ENERGY_PER_CELL
+        self.energy_used += config.ENERGY_PER_CELL
         self.distance_travelled += 1

@@ -26,7 +26,7 @@ At the start of the day, a customer places a delivery order. Nearby vans check t
 
 ## What we measure
 
-The simulator records completed, waiting, and lost deliveries; average delivery time in simulation ticks; vehicle failures and battery failures; task reassignment and recovery time; fleet utilization; and message traffic. The experiment scripts run repeatable comparisons across seeds and export CSV summaries and charts. Deadline-based on-time and late percentages are a possible next metric; they are not implemented yet.
+The simulator records completed, waiting, and lost deliveries; average delivery time in simulation ticks; vehicle failures and battery failures; battery energy used and charged; task reassignment and recovery time; fleet utilization; and message traffic. The experiment scripts run repeatable comparisons across seeds and export CSV summaries and charts. Deadline-based on-time and late percentages are not implemented.
 
 ## Run it
 

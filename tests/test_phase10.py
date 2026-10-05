@@ -93,6 +93,20 @@ class TestRunner(unittest.TestCase):
         self.assertEqual(result["unaccepted_auctions"], 1)
         self.assertEqual(result["auction_conflict_rate"], 0.5)
 
+    def test_movement_and_charging_record_actual_energy(self):
+        sim = Simulation(seed=14, num_agents=2, strategy="B1")
+        agent = sim.agents[0]
+        start = agent.position
+        step_x = start[0] - 1 if start[0] > 0 else start[0] + 1
+        agent._move_to((step_x, start[1]))
+        self.assertEqual(agent.energy_used, config.ENERGY_PER_CELL)
+        agent.battery = config.BATTERY_MAX - 2
+        agent._charge()
+        self.assertEqual(agent.energy_charged, 2)
+        values = summarize(sim)
+        self.assertEqual(values["energy_used"], config.ENERGY_PER_CELL)
+        self.assertEqual(values["energy_charged"], 2)
+
     def test_aggregate_computes_mean_and_std(self):
         rows = [{"experiment": "e", "group": "", "x": "1", "strategy": "B2", "seed": s,
                  **{m: "" for m in runner.METRICS}} for s in (1, 2, 3)]
