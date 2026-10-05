@@ -20,6 +20,7 @@ def summarize(sim):
                           and sim.tick > t.deadline_tick]
     recovery_events = [event for task in tasks for event in task.recovery_events]
     recovered_deliveries = sum(1 for task in tasks if task.recovery_events and task.status == COMPLETED)
+    affected_orders = len({task.task_id for task in tasks if task.orphaned_tick is not None})
     recovery_approach_distance = sum(event["recovery_approach_distance"] or 0 for event in recovery_events)
     # A task is "lost" if its owner failed and nobody took it over (recovery comes in Phase 9).
     lost = [t for t in tasks if t.status in (ASSIGNED, PICKED_UP) and t.owner_id in failed_ids]
@@ -62,6 +63,8 @@ def summarize(sim):
         "reassigned_tasks": sum(1 for t in tasks if t.reassign_count > 0),
         "recovery_events": len(recovery_events),
         "recovered_deliveries": recovered_deliveries,
+        "affected_orders": affected_orders,
+        "recovery_rate": recovered_deliveries / affected_orders if affected_orders else None,
         "recovery_approach_distance": recovery_approach_distance,
         "avg_reassignment_time": (sum(env.reassignment_times) / len(env.reassignment_times)) if env.reassignment_times else None,
         "avg_detection_latency": (sum(env.detection_ticks[a] - env.failure_ticks[a] for a in env.detection_ticks) / len(env.detection_ticks)) if env.detection_ticks else None,
@@ -69,6 +72,13 @@ def summarize(sim):
         "messages_by_type": dict(sim.bus.sent_by_type) if sim.bus is not None else {},
         "messages_sent": messages_sent,
         "messages_delivered": messages_delivered,
+        "partitioned_messages": sim.bus.messages_partitioned if sim.bus is not None else 0,
+        "communication_partitions": sim.bus.communication_partitions if sim.bus is not None else 0,
+        "network_restorations": sim.bus.network_restorations if sim.bus is not None else 0,
+        "synchronizations_completed": sim.bus.synchronizations_completed if sim.bus is not None else 0,
+        "sync_conflicts": sim.bus.sync_conflicts if sim.bus is not None else 0,
+        "route_reroutes": sum(agent.route_reroutes for agent in sim.agents),
+        "successful_reroutes": sum(agent.successful_reroutes for agent in sim.agents),
         "messages_per_completed_task": (messages_sent / len(completed)) if completed else None,
         "accepted_auctions": len(accepted_auctions),
         "conflicted_auctions": conflicted_auctions,

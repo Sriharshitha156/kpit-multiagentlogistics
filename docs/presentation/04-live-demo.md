@@ -57,7 +57,13 @@ The `Rescue` value shows replacement-to-parcel route distance and how many recov
 
 For a less scripted failure, click a vehicle with an active route. Its peers wait for the heartbeat timeout, suspect the silent vehicle, and start a new auction for unfinished work. The exact replacement can vary.
 
-### 5. Compare strategies
+### 5. Show a communication partition
+
+Use the **Partition** toolbar control or press `P`. The auction vehicles split into two groups and continue operating with the messages available inside each group. Press `1` to announce orders while the partition is active; independent groups can temporarily choose different owners. Press `P` again to restore communication, then watch the ledger synchronization and any ownership conflict resolution in the event feed. Press `T` to show the technical event names if needed. This is a controlled simulation of a network partition, not a real network outage.
+
+Press `E` for saved experiment summaries. Switch tabs with Left/Right; each view reads a local `results/<suite>/summary.csv`. If a suite is missing, the panel gives the command to generate it. The summary numbers are experimental output, not live simulation metrics.
+
+### 6. Compare strategies
 
 Press `S` for split view. Explain B1 as nearest idle without a battery feasibility rule; B2 as a central dispatcher using the cost/battery rule with immediate failure knowledge; and AUCTION as agents deciding from messages. Treat this as a visual demonstration, not a statistically controlled result.
 
@@ -72,6 +78,9 @@ Press `S` for split view. Explain B1 as nearest idle without a battery feasibili
 | `3` | Block several roads |
 | `4` | Reset and run the deterministic fail-while-carrying recovery demo |
 | `A` | Open auction details; arrows browse history |
+| `E` | Show saved experiment summaries; Left/Right changes tabs |
+| `P` | Partition or restore auction-fleet communication |
+| `T` | Toggle plain-English / technical event feed |
 | `S` | Toggle split-screen comparison |
 | `TAB` | Switch allocation strategy (or B1/B2 in split view) |
 | `D` | Toggle central dispatcher when a central strategy is active |

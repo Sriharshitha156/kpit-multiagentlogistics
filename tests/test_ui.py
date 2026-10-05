@@ -112,6 +112,32 @@ class TestWindow(unittest.TestCase):
 
     def test_drawing_works_in_every_mode(self):
         self.app.draw()
+
+    def test_partition_controls_restore_and_synchronize(self):
+        self.app.act("network")
+        self.assertTrue(self.app.sims[0].bus.partitioned)
+        self.app.handle_event(key(pygame.K_1, "1"))
+        self.assertTrue(self.app.sims[0].bus.partitioned)
+        self.assertIn("Rush hour", self.app.banner)
+        self.app.act("network")
+        self.assertFalse(self.app.sims[0].bus.partitioned)
+        self.assertGreater(self.app.sims[0].bus.network_restorations, 0)
+
+    def test_results_overlay_reads_saved_rows_and_renders(self):
+        self.app.handle_event(key(pygame.K_e, "e"))
+        self.assertTrue(self.app.analytics_open)
+        path, rows = ui.load_result_rows("suite-not-generated", "deadline_scenarios")
+        self.assertTrue(path.endswith("summary.csv"))
+        self.assertEqual(rows, [])
+        self.app.draw()
+        self.app.handle_event(key(pygame.K_RIGHT))
+        self.assertEqual(self.app.analytics_tab, 1)
+        self.app.handle_event(key(pygame.K_ESCAPE))
+        self.assertFalse(self.app.analytics_open)
+
+    def test_feed_technical_toggle_key(self):
+        self.app.handle_event(key(pygame.K_t, "t"))
+        self.assertTrue(self.app.show_technical_feed)
         self.app.help_open = True
         self.app.draw()
         self.app.help_open = False

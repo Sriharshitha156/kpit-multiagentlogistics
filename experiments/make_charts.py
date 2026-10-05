@@ -57,6 +57,10 @@ PANELS = {
                            ("late", "Late completed orders", ALL),
                            ("overdue_unfinished", "Overdue unfinished orders", ALL),
                            ("completed", "Completed orders", ALL)],
+    "communication_partition": [("completion_rate", "Completion rate", ["AUCTION"]),
+                                 ("partitioned_messages", "Messages blocked by partition", ["AUCTION"]),
+                                 ("sync_conflicts", "Ownership conflicts resolved", ["AUCTION"]),
+                                 ("synchronizations_completed", "Completed synchronizations", ["AUCTION"])],
     "auction_consistency": [("auction_conflict_rate", "Fraction of accepted auctions with conflicting claims", ["AUCTION"]),
                             ("conflicted_auctions", "Auctions with multiple accept claims", ["AUCTION"]),
                             ("unaccepted_auctions", "Auctions with no observed accept claim", ["AUCTION"]),
@@ -146,6 +150,7 @@ def xlabel(experiment):
             "scale_tasks": "Fixed number of orders", "scale_obstacles": "Obstacle density",
             "stress_scenarios": "Predefined stress scenario",
             "deadline_scenarios": "Predefined stress scenario",
+            "communication_partition": "Network condition",
             "auction_consistency": "Message loss probability",
             "energy_scenarios": "Battery stress scenario"}[experiment]
 

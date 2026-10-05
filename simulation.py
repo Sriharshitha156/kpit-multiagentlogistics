@@ -85,6 +85,28 @@ class Simulation:
                           {"task_id": task_id, "epoch": task.epoch})
         return True
 
+    def partition_network(self, groups=None):
+        """Partition auction agents into local communication groups."""
+        if self.bus is None:
+            return False
+        alive = [agent.agent_id for agent in self.agents if agent.is_alive()]
+        if len(alive) < 2:
+            return False
+        if groups is None:
+            midpoint = (len(alive) + 1) // 2
+            groups = (alive[:midpoint], alive[midpoint:])
+        self.bus.set_partition(groups, self.tick)
+        return True
+
+    def restore_network(self):
+        """Restore agent links, then let every agent broadcast its own task ledger."""
+        self._refresh_alive()
+        if self.bus is None or not self.bus.restore_network(self.tick):
+            return False
+        for agent in self.agents:
+            agent.broadcast_sync_state(self.tick)
+        return True
+
     def add_obstacle(self, cell=None):
         """
         Block a new cell (a changing road condition) and tell every living agent.
@@ -110,8 +132,12 @@ class Simulation:
                 return None
         elif not self.env.add_obstacle(cell, protected):
             return None
+        reroutes_before = sum(agent.route_reroutes for agent in self.agents)
         for agent in self.agents:                  # a sensor event, not agent-to-agent traffic
             agent.perceive_obstacle(cell)
+        if self.bus is not None:
+            reroutes = sum(agent.route_reroutes for agent in self.agents) - reroutes_before
+            self.bus.note_event("ROAD_BLOCKED", {"cell": cell, "routes_invalidated": reroutes}, self.tick)
         return cell
 
     def step(self):
@@ -157,6 +183,11 @@ class Simulation:
                 failure_tick = agent.failed_tick if agent.failed_tick is not None else self.tick
                 self.env.failure_ticks[agent.agent_id] = failure_tick
                 self.env.record_agent_failure(agent.agent_id, failure_tick)
+                if self.bus is not None:
+                    affected = self.env.failure_affected_tasks.get(agent.agent_id, [])
+                    self.bus.note_event("VEHICLE_FAILED", {"agent_id": agent.agent_id,
+                                                            "affected_task_ids": affected}, failure_tick,
+                                        once_key=("failure", agent.agent_id))
 
     def fail_agent(self, agent_id, reason="CLICKED"):
         """Kill an agent (used by the click-to-fail demo)."""

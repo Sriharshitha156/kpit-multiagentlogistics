@@ -59,6 +59,12 @@ The normal simulator and all experiment suites use the deterministic in-process 
 | `AGENT_FAILURE` | Peer announces that an agent is considered failed. |
 | `TASK_REASSIGN` | Peer announces a new auction epoch for orphaned work. |
 
+## Communication partition and reconnection
+
+Press `P` to split auction vehicles into two groups. Agent-to-agent messages only reach vehicles in the same group, so each side can run a local auction and temporarily assign the same order. The order desk can still announce customer requests to both groups; it does not select an owner. Press `P` again to restore links. Each vehicle broadcasts its task ledger and recipients reconcile ownership; matching bids are resolved by the existing cost-then-agent-ID rule. The feed reports partition, restoration, synchronization, and ownership conflicts.
+
+This is deterministic simulation logic using a shared in-process bus and environment. It demonstrates local operation and reconciliation behavior; it does not establish formal consensus or model a production network.
+
 ## How to explain decentralization honestly
 
 Say: “Task allocation and failure suspicion are decided by individual agents from messages and local ledgers. The prototype still runs every agent and the message bus in one process, and the environment provides shared ground truth and simulated events.” Do not describe it as a distributed deployment or real vehicle-to-vehicle network.

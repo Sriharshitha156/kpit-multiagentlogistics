@@ -31,6 +31,7 @@ class Environment:
         self.task_by_id = {}       # quick lookup: task_id -> Task
         # ground truth about failures, used ONLY by the metrics (agents never read these)
         self.failure_ticks = {}        # agent_id -> tick it really failed
+        self.failure_affected_tasks = {} # agent_id -> task IDs orphaned by the failure
         self.detection_ticks = {}      # agent_id -> tick the first peer noticed
         self.reassignment_times = []   # ticks from an owner's failure to a new owner's accept
         self.false_suspicions = 0      # a living agent was declared dead
@@ -166,10 +167,13 @@ class Environment:
 
     def record_agent_failure(self, agent_id, tick):
         """Mark unfinished work owned by a newly failed agent as orphaned."""
+        affected = []
         for task in self.tasks:
             if task.owner_id == agent_id and task.status in ("ASSIGNED", "PICKED_UP"):
                 task.orphaned_by = agent_id
                 task.orphaned_tick = tick
+                affected.append(task.task_id)
+        self.failure_affected_tasks[agent_id] = affected
 
     def record_detection(self, failed_id, tick):
         """A peer declared `failed_id` dead. Count the first real detection, and any false alarm."""

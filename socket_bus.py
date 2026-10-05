@@ -75,6 +75,9 @@ class LocalUdpMessageBus(MessageBus):
 
         sender_socket = self.desk_socket if sender_id == DESK else self.agent_sockets[sender_id]
         for recipient_id in receivers:
+            if not self._partition_allows(sender_id, recipient_id):
+                self.messages_partitioned += 1
+                continue
             if config.LOSS_PROBABILITY > 0 and self.rng.random() < config.LOSS_PROBABILITY:
                 self.messages_lost += 1
                 continue
@@ -108,8 +111,11 @@ class LocalUdpMessageBus(MessageBus):
         still_in_flight = []
         for message in self.pending:
             if message.tick_deliver <= tick:
-                self.inboxes.setdefault(message.receiver_id, []).append(message)
-                self.messages_delivered += 1
+                if self._partition_allows(message.sender_id, message.receiver_id):
+                    self.inboxes.setdefault(message.receiver_id, []).append(message)
+                    self.messages_delivered += 1
+                else:
+                    self.messages_partitioned += 1
             else:
                 still_in_flight.append(message)
         self.pending = still_in_flight

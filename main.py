@@ -7,6 +7,8 @@ block roads, and watch how the fleet reacts. Press ? (or click Help) for a guide
 mouse over anything to see what it is.
 """
 
+import csv
+import os
 import random
 import sys
 
@@ -15,7 +17,8 @@ import pygame
 import config
 import scenarios
 from agent import CHARGING, DELIVERING, FAILED, GOING_TO_CHARGE, GOING_TO_PICKUP
-from communication import HEARTBEAT, describe_message
+from communication import (COMMUNICATION_PARTITION, COMMUNICATION_RESTORED, HEARTBEAT, SYNC_COMPLETE,
+                           SYNC_CONFLICT, describe_message, explain_message)
 from metrics import summarize
 from simulation import Simulation
 from task import ASSIGNED, CANCELLED, COMPLETED, OPEN, PICKED_UP
@@ -43,7 +46,10 @@ AGENT_COLOURS = [(25, 195, 169), (255, 140, 90), (120, 160, 255), (240, 120, 200
                  (170, 220, 90), (255, 220, 100), (180, 130, 255), (100, 220, 230)]
 FEED_COLOURS = {"TASK_REQUEST": TEXT, "TASK_BID": MUTED, "TASK_ACCEPT": TEAL, "TASK_CANCEL": RED,
                 "DELIVERY_COMPLETE": GREEN,
-                "TASK_REASSIGN": YELLOW, "AGENT_FAILURE": RED, "HEARTBEAT": (90, 110, 130)}
+                "TASK_REASSIGN": YELLOW, "AGENT_FAILURE": RED, "HEARTBEAT": (90, 110, 130),
+                "VEHICLE_FAILED": RED, "ROAD_BLOCKED": YELLOW, "REROUTE_SUCCESS": GREEN,
+                COMMUNICATION_PARTITION: RED, COMMUNICATION_RESTORED: TEAL,
+                SYNC_COMPLETE: GREEN, SYNC_CONFLICT: YELLOW}
 
 STRATEGIES = ["B1", "B2", "AUCTION"]
 STRATEGY_LABELS = {"B1": "B1 central, nearest idle", "B2": "B2 central, same cost + battery rule",
@@ -261,8 +267,16 @@ def draw_panel(screen, sim, fonts, ticks_per_second, paused, top):
     px = config.GRID_WIDTH * config.CELL_SIZE
     pygame.draw.rect(screen, PANEL_BG, (px, top, config.PANEL_WIDTH, config.GRID_HEIGHT * config.CELL_SIZE))
     x = px + 14
-    draw_text(screen, title_font, "Smart Multi-Agent Delivery", x, top + 8)
+    draw_text(screen, title_font, "AutoSwarm | Urban EV delivery", x, top + 8)
     draw_text(screen, small_font, "Strategy: " + STRATEGY_LABELS[sim.strategy], x, top + 30, MUTED)
+    if sim.bus is None:
+        network = "not used"
+    elif sim.bus.partitioned:
+        network = "partitioned (%d groups)" % len(set(sim.bus.partition_group_by_agent.values()))
+    elif sim.bus.network_restorations > sim.bus.synchronizations_completed:
+        network = "synchronizing"
+    else:
+        network = "connected"
     rows = [("Tick", str(sim.tick) + ("  (paused)" if paused else "  @ " + str(ticks_per_second) + "/s"), TEXT),
             ("Agents", "%d alive, %d failed" % (sim.alive_count(), sim.failed_count()), TEXT),
             ("Waiting orders", str(m["waiting"]), TEXT),
@@ -270,16 +284,19 @@ def draw_panel(screen, sim, fonts, ticks_per_second, paused, top):
             ("On time / late", "%d / %d" % (m["on_time"], m["late"]), GREEN if not m["late"] else RED),
             ("Overdue open", str(m["overdue_unfinished"]), RED if m["overdue_unfinished"] else TEXT),
             ("Avg delivery", avg, TEXT),
-            ("Lost / recovered", "%d / %d" % (m["lost"], m["reassigned_tasks"]), RED if m["lost"] else TEXT),
-            ("Avg reassign", reassign, TEXT),
-            ("Rescue", "%d cells / %d done" % (m["recovery_approach_distance"], m["recovered_deliveries"]), TEXT),
-            ("Dist / util", "%d cells, %.0f%%" % (m["total_distance"], 100 * m["utilization"]), TEXT),
+            ("Lost / recovered", "%d / %d" % (m["lost"], m["recovered_deliveries"]), RED if m["lost"] else TEXT),
+            ("Affected / rate", "%d / %s" % (m["affected_orders"],
+             "-" if m["recovery_rate"] is None else "%.0f%%" % (100 * m["recovery_rate"])), TEXT),
+            ("Avg recovery", reassign, TEXT),
+            ("Reroutes", "%d done / %d needed" % (m["successful_reroutes"], m["route_reroutes"]), TEXT),
+            ("Distance / util.", "%d cells, %.0f%%" % (m["total_distance"], 100 * m["utilization"]), TEXT),
             ("Messages", messages, TEXT),
+            ("Network", network, RED if "partitioned" in network else YELLOW if "synchronizing" in network else TEXT),
             ("Dispatcher", dispatcher, dispatcher_colour)]
     y = top + 50
     for name, value, colour in rows:
         draw_text(screen, font, name, x, y, MUTED)
-        draw_text(screen, font, value, x + 118, y, colour)
+        draw_text(screen, font, value, x + 155, y, colour)
         y += 17
     y += 4
     draw_text(screen, font, "Vehicles (battery, action)", x, y, MUTED)
@@ -323,7 +340,7 @@ def draw_stats(screen, sim, x, y, fonts, title):
         y += 14
 
 
-def draw_feed(screen, sim, x, y, w, h, fonts, show_heartbeats):
+def draw_feed(screen, sim, x, y, w, h, fonts, show_heartbeats, technical=False):
     """The live message feed: what the vehicles are saying to each other right now."""
     small_font, tiny_font = fonts[1], fonts[3]
     pygame.draw.rect(screen, FEED_BG, (x, y, w, h))
@@ -331,13 +348,16 @@ def draw_feed(screen, sim, x, y, w, h, fonts, show_heartbeats):
         draw_text(screen, small_font, "Live message feed: none. A central dispatcher decides, vehicles send no messages.",
                   x + 10, y + 8, MUTED)
         return
-    draw_text(screen, small_font, "Live message feed (what the vehicles say to each other)"
-              + ("" if show_heartbeats else "   heartbeats hidden: use the Heartbeats button"), x + 10, y + 6, TEAL)
+    title = "Technical message log (T to explain)" if technical else "What is happening (T for technical log)"
+    draw_text(screen, small_font, title + ("" if show_heartbeats else "   heartbeats hidden: press H"),
+              x + 10, y + 6, TEAL)
     lines = [e for e in sim.bus.log if show_heartbeats or e[1] != HEARTBEAT]
     lines = lines[-max(1, int((h - 26) / 15)):]
     ly = y + 24
     for tick, msg_type, sender_id, payload in lines:
-        draw_text(screen, tiny_font, "t=%-5d %s" % (tick, describe_message(msg_type, sender_id, payload)),
+        description = (describe_message(msg_type, sender_id, payload) if technical
+                       else explain_message(msg_type, sender_id, payload))
+        draw_text(screen, tiny_font, "t=%-5d %s" % (tick, description),
                   x + 10, ly, FEED_COLOURS.get(msg_type, MUTED))
         ly += 15
 
@@ -370,7 +390,9 @@ def draw_auction_overlay(screen, sim, record, record_index, record_count, fonts)
         bids = sorted(record["bids"].items(), key=lambda item: (item[1], item[0]))
         if bids:
             for agent_id, cost in bids:
-                draw_text(screen, small_font, "A%d   bid %.3f" % (agent_id, cost), x + 12, y, TEXT)
+                details = record.get("bid_details", {}).get(agent_id, {})
+                battery = "battery %.0f%%" % details.get("battery_pct", 0) if details else ""
+                draw_text(screen, small_font, "A%d   score %.3f   %s" % (agent_id, cost, battery), x + 12, y, TEXT)
                 y += 21
         else:
             draw_text(screen, small_font, "No bids recorded for this auction.", x + 12, y, MUTED)
@@ -391,6 +413,22 @@ def draw_auction_overlay(screen, sim, record, record_index, record_count, fonts)
             draw_text(screen, font, "Winner: A%d (accepted at %.3f)" % (winner_id, winner_cost), x, y, GREEN)
             y += 24
             expected = min(bids, key=lambda item: (item[1], item[0])) if bids else None
+            details = record.get("bid_details", {}).get(winner_id, {})
+            if details:
+                draw_text(screen, small_font,
+                          "Score = time weight × (priority × pickup ETA + delivery time) + load weight × current load",
+                          x, y, MUTED)
+                y += 19
+                draw_text(screen, small_font,
+                          "Winner A%d: pickup %d cells / %.1f ticks; delivery %d cells / %.1f ticks; load %d; priority ×%.2f" %
+                          (winner_id, details["distance_to_pickup"], details["pickup_time"],
+                           details["delivery_distance"], details["delivery_time"], details["load"],
+                           details["priority_factor"]), x, y, TEXT)
+                y += 19
+                draw_text(screen, small_font,
+                          "Battery %.1f%%; energy need incl. reserve %.1f units (battery is an eligibility check)" %
+                          (details["battery_pct"], details["energy_required_with_reserve"]), x, y, MUTED)
+                y += 22
             if expected == (winner_id, winner_cost):
                 draw_text(screen, small_font, "Reason: lowest recorded bid; ties go to the lower agent ID.", x, y)
             else:
@@ -416,6 +454,88 @@ def draw_banner(screen, text, centre_x, y):
         rect = surface.get_rect(center=(centre_x, y))
         pygame.draw.rect(screen, YELLOW, rect.inflate(24, 10), border_radius=6)
         screen.blit(surface, rect)
+
+
+RESULT_TABS = [("Deadlines", "paired-deadlines", "deadline_scenarios"),
+               ("Scale", "paired-scale-clean", "scale_agents"),
+               ("Recovery", "paired-deadlines", "deadline_scenarios"),
+               ("Network", "paired-partition", "communication_partition")]
+
+
+def load_result_rows(suite, experiment):
+    """Read locally generated summary data; never invent a fallback result."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", suite, "summary.csv")
+    if not os.path.isfile(path):
+        return path, []
+    with open(path, newline="", encoding="utf-8-sig") as handle:
+        return path, [row for row in csv.DictReader(handle) if row.get("experiment") == experiment]
+
+
+def draw_analytics_overlay(screen, tab_index, fonts):
+    width, height = screen.get_size()
+    veil = pygame.Surface((width, height), pygame.SRCALPHA)
+    veil.fill((5, 12, 22, 238))
+    screen.blit(veil, (0, 0))
+    panel = pygame.Rect(36, 32, width - 72, height - 64)
+    pygame.draw.rect(screen, PANEL_BG, panel, border_radius=10)
+    pygame.draw.rect(screen, TEAL, panel, 2, border_radius=10)
+    font, small, title = fonts[0], fonts[1], fonts[2]
+    draw_text(screen, title, "AutoSwarm | Experiment results", panel.x + 22, panel.y + 16, TEAL)
+    y = panel.y + 52
+    for i, (name, _, _) in enumerate(RESULT_TABS):
+        draw_text(screen, small, ("[ %s ]" if i == tab_index else "  %s  ") % name,
+                  panel.x + 22 + i * 150, y, YELLOW if i == tab_index else MUTED)
+    name, suite, experiment = RESULT_TABS[tab_index]
+    path, rows = load_result_rows(suite, experiment)
+    y += 36
+    draw_text(screen, small, "Source: results/%s/summary.csv  |  x axis: %s  |  mean ± std across seeds" %
+              (suite, "network condition" if name == "Network" else "scenario / fleet size"), panel.x + 22, y, MUTED)
+    y += 25
+    if not rows:
+        draw_text(screen, font, "No saved results for this tab yet.", panel.x + 22, y, YELLOW)
+        draw_text(screen, small, "Run: python experiments/run_experiments.py --suite %s" % suite,
+                  panel.x + 22, y + 27, TEXT)
+    else:
+        metric_names = ({"Deadlines": ["on_time_rate", "late", "overdue_unfinished", "completed"],
+                         "Scale": ["completion_rate", "completed", "compute_seconds", "msgs_per_completed"],
+                         "Recovery": ["on_time_rate", "late", "lost", "avg_reassign_time"],
+                         "Network": ["completion_rate", "partitioned_messages", "sync_conflicts",
+                                     "synchronizations_completed"]})[name]
+        metric_labels = {"on_time_rate": "On-time %", "late": "Late orders",
+                         "overdue_unfinished": "Overdue open", "completed": "Delivered",
+                         "completion_rate": "Completion %", "compute_seconds": "Runtime (s)",
+                         "msgs_per_completed": "Msgs / delivery", "lost": "Lost orders",
+                         "avg_reassign_time": "Recovery ticks", "partitioned_messages": "Blocked msgs",
+                         "sync_conflicts": "Conflicts", "synchronizations_completed": "Syncs"}
+        headers = ["Scenario", "Fleet", "Seeds"] + [metric_labels.get(metric, metric) for metric in metric_names]
+        positions = [panel.x + 22, panel.x + 175, panel.x + 275]
+        positions += [panel.x + 350 + i * max(110, (panel.width - 380) // len(metric_names))
+                      for i in range(len(metric_names))]
+        for idx, header in enumerate(headers):
+            draw_text(screen, small, header, positions[idx], y, TEAL)
+        y += 23
+        for row in rows[:max(1, int((panel.bottom - y - 32) / 22))]:
+            values = [row.get("x", ""), row.get("strategy", ""), row.get("n", "")]
+            for metric in metric_names:
+                mean, std = row.get(metric + "_mean", ""), row.get(metric + "_std", "")
+                if mean:
+                    try:
+                        mean_value = float(mean)
+                        fmt = "%.1f%%" % (100 * mean_value) if metric in ("on_time_rate", "completion_rate") else "%.2f" % mean_value
+                        std_value = float(std) if std else 0
+                        if metric in ("on_time_rate", "completion_rate"):
+                            std_value *= 100
+                        fmt += " ± %.2f" % std_value if std else ""
+                    except ValueError:
+                        fmt = mean
+                else:
+                    fmt = "—"
+                values.append(fmt)
+            for idx, value in enumerate(values):
+                draw_text(screen, small, str(value), positions[idx], y, TEXT)
+            y += 22
+    draw_text(screen, small, "Left/Right: switch results  |  E or Esc: close  |  values come from saved CSVs",
+              panel.x + 22, panel.bottom - 28, MUTED)
 
 
 # ---------- toolbar ----------
@@ -538,7 +658,7 @@ class App:
 
     def __init__(self, split=False, show_help=True, transport="inprocess"):
         pygame.init()
-        caption = "Smart Multi-Agent Delivery Simulator"
+        caption = "AutoSwarm - Urban EV Delivery Simulator"
         if transport == "udp":
             caption += " - localhost UDP"
         pygame.display.set_caption(caption)
@@ -553,8 +673,11 @@ class App:
         self.ticks_per_second = config.TICKS_PER_SECOND
         self.paused = False
         self.show_heartbeats = False
+        self.show_technical_feed = False
         self.help_open = show_help
         self.auction_open = False
+        self.analytics_open = False
+        self.analytics_tab = 0
         self.auction_index = 0
         self.banner, self.banner_until = "", 0
         self.accumulator = 0.0
@@ -589,25 +712,30 @@ class App:
     def button_groups(self):
         central = self.sims[0].dispatcher
         if central is None:
-            dispatcher_label, dispatcher_enabled = "Dispatcher: none", False
+            dispatcher_label, dispatcher_enabled = "Dispatch: --", False
         else:
-            dispatcher_label, dispatcher_enabled = "Dispatcher: " + ("ON" if central.online else "OFF"), True
+            dispatcher_label, dispatcher_enabled = "Dispatch " + ("ON" if central.online else "OFF"), True
         strategy = self.left_strategy if self.split else self.single_strategy
-        return [[{"action": "help", "label": "? Help", "enabled": True},
-                 {"action": "auction", "label": "Auction bids (A)", "enabled": True}],
+        auction_sim = self._auction_sim()
+        network_available = bool(auction_sim and len([a for a in auction_sim.agents if a.is_alive()]) >= 2)
+        network_label = "Restore" if auction_sim and auction_sim.bus and auction_sim.bus.partitioned else "Partition"
+        return [[{"action": "help", "label": "Help", "enabled": True},
+                 {"action": "auction", "label": "Bids (A)", "enabled": True},
+                 {"action": "analytics", "label": "Results", "enabled": True}],
                 [{"action": "pause", "label": "Resume" if self.paused else "Pause", "enabled": True, "active": self.paused},
-                 {"action": "slower", "label": "Slower", "enabled": True},
-                 {"action": "faster", "label": "Faster", "enabled": True}],
-                [{"action": "rush", "label": "Rush hour", "enabled": True},
+                 {"action": "slower", "label": "-Speed", "enabled": True},
+                 {"action": "faster", "label": "+Speed", "enabled": True}],
+                [{"action": "rush", "label": "Rush", "enabled": True},
                  {"action": "storm", "label": "Fail 3", "enabled": True},
-                 {"action": "block", "label": "Block roads", "enabled": True}],
-                [{"action": "new_map", "label": "New map", "enabled": True},
-                 {"action": "strategy", "label": "Strategy: " + STRATEGY_SHORT[strategy], "enabled": True},
-                 {"action": "split", "label": "Split screen", "enabled": True, "active": self.split}],
+                 {"action": "block", "label": "Block", "enabled": True}],
+                [{"action": "new_map", "label": "Map", "enabled": True},
+                 {"action": "strategy", "label": "Mode " + STRATEGY_SHORT[strategy], "enabled": True},
+                 {"action": "split", "label": "Split", "enabled": True, "active": self.split}],
                 [{"action": "dispatcher", "label": dispatcher_label, "enabled": dispatcher_enabled},
-                 {"action": "heartbeats", "label": "HB " + ("on" if self.show_heartbeats else "off"),
+                 {"action": "network", "label": network_label, "enabled": network_available},
+                 {"action": "heartbeats", "label": "HB" + ("+" if self.show_heartbeats else "-"),
                   "enabled": True},
-                 {"action": "cancel", "label": "Cancel (C)",
+                 {"action": "cancel", "label": "Cancel",
                   "enabled": bool(self.cancellable_task_ids())}]]
 
     def button_rects(self):
@@ -622,6 +750,23 @@ class App:
             if self.auction_open:
                 sim = self._auction_sim()
                 self.auction_index = max(0, len(sim.bus.auction_history) - 1) if sim and sim.bus else 0
+        elif name == "analytics":
+            self.analytics_open = not self.analytics_open
+        elif name == "technical_feed":
+            self.show_technical_feed = not self.show_technical_feed
+        elif name == "network":
+            sim = self._auction_sim()
+            if sim is None or sim.bus is None:
+                self.say("Network partition is available for the auction fleet")
+            elif sim.bus.partitioned:
+                sim.restore_network()
+                self.say("Network restored; vehicles are exchanging task ledgers", seconds=3)
+            else:
+                agents = [agent.agent_id for agent in sim.agents if agent.is_alive()]
+                midpoint = max(1, len(agents) // 2)
+                groups = [agents[:midpoint], agents[midpoint:]]
+                sim.partition_network(groups)
+                self.say("Communication split into 2 local groups. Press 1 to add an order.", seconds=4)
         elif name == "cancel":
             task_ids = self.cancellable_task_ids()
             if not task_ids:
@@ -677,7 +822,7 @@ class App:
     KEYS = {pygame.K_SPACE: "pause", pygame.K_UP: "faster", pygame.K_DOWN: "slower", pygame.K_1: "rush",
             pygame.K_2: "storm", pygame.K_3: "block", pygame.K_4: "recovery_demo", pygame.K_r: "new_map", pygame.K_TAB: "strategy",
             pygame.K_s: "split", pygame.K_d: "dispatcher", pygame.K_h: "heartbeats", pygame.K_a: "auction", pygame.K_F1: "help",
-            pygame.K_c: "cancel",
+            pygame.K_c: "cancel", pygame.K_e: "analytics", pygame.K_p: "network", pygame.K_t: "technical_feed",
             pygame.K_QUESTION: "help", pygame.K_SLASH: "help"}
 
     def _auction_sim(self):
@@ -704,6 +849,18 @@ class App:
                 return
             if event.type == pygame.MOUSEBUTTONDOWN:
                 self.auction_open = False
+                return
+        if self.analytics_open:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT:
+                    self.analytics_tab = (self.analytics_tab - 1) % len(RESULT_TABS)
+                elif event.key == pygame.K_RIGHT:
+                    self.analytics_tab = (self.analytics_tab + 1) % len(RESULT_TABS)
+                else:
+                    self.analytics_open = False
+                return
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.analytics_open = False
                 return
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
@@ -763,13 +920,15 @@ class App:
             stats_y = left_view.oy + left_view.height() + 6
             draw_stats(screen, left, 10, stats_y, fonts, STRATEGY_LABELS[left.strategy])
             draw_stats(screen, right, 630, stats_y, fonts, STRATEGY_LABELS[right.strategy])
-            draw_feed(screen, right, 0, 596, SPLIT_SIZE[0], SPLIT_SIZE[1] - 596, fonts, self.show_heartbeats)
+            draw_feed(screen, right, 0, 596, SPLIT_SIZE[0], SPLIT_SIZE[1] - 596, fonts,
+                      self.show_heartbeats, self.show_technical_feed)
             banner_x = SPLIT_SIZE[0] // 2
         else:
             sim, view = self.sims[0], single_view()
             draw_world(screen, sim, view, fonts[1])
             draw_panel(screen, sim, fonts, self.ticks_per_second, self.paused, TOOLBAR_H)
-            draw_feed(screen, sim, 0, TOOLBAR_H + view.height(), SINGLE_SIZE[0], FEED_HEIGHT, fonts, self.show_heartbeats)
+            draw_feed(screen, sim, 0, TOOLBAR_H + view.height(), SINGLE_SIZE[0], FEED_HEIGHT, fonts,
+                      self.show_heartbeats, self.show_technical_feed)
             banner_x = view.width() // 2
         draw_toolbar(screen, self.button_rects(), self.button_font, mouse, screen.get_width())
         draw_banner(screen, banner, banner_x, TOOLBAR_H + (60 if self.split else 24))
@@ -790,6 +949,8 @@ class App:
             else:
                 record = None
             draw_auction_overlay(screen, sim, record, self.auction_index, len(history), fonts)
+        elif self.analytics_open:
+            draw_analytics_overlay(screen, self.analytics_tab, fonts)
         pygame.display.flip()
 
     def run(self, max_frames=None):

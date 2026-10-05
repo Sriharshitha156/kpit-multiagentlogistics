@@ -40,7 +40,10 @@ CONSENSUS_SEEDS = [4001, 4002, 4003, 4004, 4005]
 ENERGY_SEEDS = [5001, 5002, 5003]
 
 METRICS = ["created", "completed", "completion_rate", "on_time", "late", "overdue_unfinished",
-           "on_time_rate", "lost", "waiting", "avg_delivery", "reassigned",
+           "on_time_rate", "lost", "waiting", "avg_delivery", "reassigned", "affected_orders",
+           "recovered_deliveries", "recovery_rate", "route_reroutes", "successful_reroutes",
+           "communication_partitions", "network_restorations", "synchronizations_completed",
+           "partitioned_messages", "sync_conflicts",
            "avg_reassign_time", "avg_detection_latency", "false_suspicions", "battery_failures",
            "failed_agents", "utilization", "total_distance", "messages_sent", "messages_delivered",
            "heartbeat_sent", "msgs_per_completed"]
@@ -56,10 +59,10 @@ def exp(name, x_name, xs, build, strategies=STRATEGIES, groups=("",)):
 
 
 def scenario(num_agents=8, overrides=None, failures=0, outage=False, task_count=None,
-            task_priority=None, initial_battery=None):
+            task_priority=None, initial_battery=None, network_partition=False):
     return {"num_agents": num_agents, "overrides": overrides or {}, "failures": failures,
             "outage": outage, "task_count": task_count, "task_priority": task_priority,
-            "initial_battery": initial_battery}
+            "initial_battery": initial_battery, "network_partition": network_partition}
 
 
 def main_experiments():
@@ -125,6 +128,13 @@ def deadline_experiments():
     return experiments
 
 
+def partition_experiments():
+    return [exp("communication_partition", "network", ["connected", "partitioned"],
+                lambda value, group: scenario(num_agents=8, task_count=50,
+                                              network_partition=(value == "partitioned")),
+                strategies=["AUCTION"])]
+
+
 def consensus_experiments():
     return [exp("auction_consistency", "message loss probability", [0.0, 0.05, 0.10, 0.20, 0.35, 0.50],
                 lambda loss, group: scenario(num_agents=12, failures=2, task_count=60,
@@ -157,7 +167,8 @@ SUITES = {"main": (main_experiments, MAIN_SEEDS, 1500),
           "paired-consensus": (consensus_experiments, CONSENSUS_SEEDS, 600),
           "paired-energy": (energy_experiments, ENERGY_SEEDS, 600),
           # Fresh results for deadline outcomes after the deadline model was added.
-          "paired-deadlines": (deadline_experiments, SCALE_SEEDS, 600)}
+          "paired-deadlines": (deadline_experiments, SCALE_SEEDS, 600),
+          "paired-partition": (partition_experiments, SCALE_SEEDS, 600)}
 
 
 def make_jobs(experiments, seeds):
@@ -215,6 +226,10 @@ def run_job(job, ticks):
                          task_schedule=task_schedule, initial_battery=job.get("initial_battery"))
         doomed = failing_agents(job["seed"], job["num_agents"], job["failures"])
         for t in range(ticks):
+            if job.get("network_partition") and t == FAIL_TICK:
+                sim.partition_network()
+            if job.get("network_partition") and t == FAIL_TICK + 10:
+                sim.restore_network()
             if t == FAIL_TICK:
                 for agent_id in doomed:
                     sim.fail_agent(agent_id)
@@ -235,6 +250,13 @@ def run_job(job, ticks):
         "overdue_unfinished": m["overdue_unfinished"], "on_time_rate": m["on_time_rate"],
         "lost": m["lost"], "waiting": m["waiting"], "avg_delivery": m["average_delivery_time"],
         "reassigned": m["reassigned_tasks"], "avg_reassign_time": m["avg_reassignment_time"],
+        "affected_orders": m["affected_orders"], "recovered_deliveries": m["recovered_deliveries"],
+        "recovery_rate": m["recovery_rate"], "route_reroutes": m["route_reroutes"],
+        "successful_reroutes": m["successful_reroutes"],
+        "communication_partitions": m["communication_partitions"],
+        "network_restorations": m["network_restorations"],
+        "synchronizations_completed": m["synchronizations_completed"],
+        "partitioned_messages": m["partitioned_messages"], "sync_conflicts": m["sync_conflicts"],
         "avg_detection_latency": m["avg_detection_latency"], "false_suspicions": m["false_suspicions"],
         "battery_failures": m["battery_failures"], "failed_agents": m["failed_agents"],
         "utilization": m["utilization"], "total_distance": m["total_distance"],
@@ -275,7 +297,7 @@ def aggregate(rows, metrics=METRICS):
     for (experiment, group, strategy, x), items in buckets.items():
         out = {"experiment": experiment, "group": group, "x": x, "strategy": strategy, "n": len(items)}
         for metric in metrics:
-            values = [float(r[metric]) for r in items if r[metric] not in ("", None)]
+            values = [float(r[metric]) for r in items if r.get(metric) not in ("", None)]
             out[metric + "_mean"] = statistics.mean(values) if values else ""
             out[metric + "_std"] = statistics.stdev(values) if len(values) > 1 else (0.0 if values else "")
         summary.append(out)

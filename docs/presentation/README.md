@@ -1,10 +1,10 @@
-# Presentation guide
+# AutoSwarm presentation guide
 
-Use these short guides to prepare the demo or answer technical questions. They describe the current simulator, including its assumptions and limits.
+Use these short guides to prepare the demo or answer technical questions. They describe the current simulator, its assumptions, and its limits.
 
-## Roadmap status
+## Current implementation
 
-The requested Phase 0–16 implementation checklist is complete, including the strict reviewer pass. Deadline reporting and GUI cancellation from the initial pitch are now implemented. State the model assumptions: deadlines default to 90 simulated minutes at one minute per tick, and cancellation applies only before assignment. The test suite currently has 80 tests and covers these behaviors.
+The original implementation checklist and the final AutoSwarm integration pass are complete. The final pass adds a communication-partition demo with ledger synchronization, a CSV-backed experiment-results view, a plain-English event feed with a technical-log toggle, and actual bid-factor details in the auction inspector. Orders default to 90 simulated minutes at one minute per tick; this remains an illustrative assumption. Cancellation applies only before assignment.
 
 1. [Project pitch](01-project-pitch.md) — 30-second and 2-minute explanations.
 2. [Architecture](02-architecture.md) — components, message flow, and where decisions happen.
@@ -17,8 +17,8 @@ The requested Phase 0–16 implementation checklist is complete, including the s
 
 ## Safe headline claim
 
-This is a grid-based, single-process simulation of decentralized EV delivery task allocation. Agents bid using their own state and a simulated message bus; the project compares that approach with two central dispatch baselines and records deadline outcomes using configurable simulation assumptions. It is not a real-city deployment or networked fleet.
+AutoSwarm is a grid-based, single-process simulation of decentralized EV delivery task allocation. Agents bid using their local state and a simulated message bus; the project compares that approach with two central dispatch baselines and records deadline outcomes under configurable assumptions. A communication partition lets isolated groups keep bidding locally, then exchange task ledgers on reconnection. This is not a real-city deployment, production vehicle network, or formal consensus protocol.
 
 ## Before presenting results
 
-The CSVs in `results/` are outputs from earlier experiment runs. Re-run the relevant suite after code changes before presenting those numbers as evidence for the current version. Explain that seeds pair initial conditions and failure identities, but strategy runs can diverge in their later random events.
+The Results view (`E`) reads saved CSV summaries and shows the source suite, strategy, seed count, means, and standard deviations. Existing results may predate the final code changes. Re-run the relevant suite before presenting values as evidence for this version. Seeds pair initial conditions and failure identities, but strategy runs can diverge in later random events.

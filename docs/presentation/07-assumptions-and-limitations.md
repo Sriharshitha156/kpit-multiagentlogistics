@@ -23,6 +23,10 @@ State these plainly if asked what the simulator proves.
 - Task cancellation is supported only while an order is waiting for assignment. The GUI can cancel the oldest waiting order; an assigned delivery cannot currently be withdrawn.
 - Existing saved experiment outputs can be stale relative to newer code changes.
 
+## Communication-partition demo
+
+Pressing `P` simulates a logical split in the in-process bus: agent messages are restricted to their group, and the order desk still broadcasts new customer requests. On restoration, vehicles exchange their local task ledgers and resolve conflicting owners. The result illustrates one reconciliation policy under these controlled conditions. It is not a real outage test, independent-agent deployment, or proof of consensus under arbitrary message loss or concurrent failures.
+
 ## Claims to avoid
 
 - “Works in a real city” or “tested on real EV data.”

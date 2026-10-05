@@ -29,6 +29,10 @@ The route estimate follows the same ordering as execution: active task first, th
 
 The world is a four-direction grid. A* uses Manhattan distance as its heuristic and returns a shortest route around known blocked cells. When a road change affects an agent's route, the agent clears/replans its path. The map generator and interactive road-blocking action preserve connectivity, so the demo avoids intentionally disconnected maps.
 
+## What the updated inspector shows
+
+The inspector now displays each recorded bid score and the winning agent's actual inputs: A* distance and time to pickup, delivery distance and time, current load, priority factor, and battery percentage. It also shows estimated energy need including reserve. Battery is an eligibility gate, not a cost term. Use `A` to open the panel, Left/Right to browse, and `T` to switch the live feed between plain-English events and technical message names.
+
 ## What the auction panel can and cannot say
 
 It can show task ID, priority, epoch, each transmitted bid, observed accept claims, and whether the accepted cost matches the lowest recorded bid. It can expose conflicting claims. It cannot prove which bids every agent received, because the bus can drop messages and the panel is a simulation-wide observer of sends.

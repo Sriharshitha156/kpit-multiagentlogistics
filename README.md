@@ -1,4 +1,4 @@
-# Smart Multi-Agent EV Delivery Simulator
+# AutoSwarm: Urban EV Delivery Coordination Simulator
 
 See the [presentation guide](docs/presentation/README.md) for a pitch, architecture overview, demo script, metric definitions, limitations, and jury Q&A.
 
@@ -17,6 +17,8 @@ This project is a **simulation**, not a deployed delivery service or a model tra
 - Rush-hour order bursts, blocked roads, and vehicle failures can be triggered during a run.
 - Heartbeats help agents detect failed peers; the surviving fleet can reclaim orphaned deliveries.
 - Split-screen mode compares the auction fleet with central dispatch strategies (nearest idle and a battery-aware dispatcher).
+- The auction fleet can be split into two communication groups. Each group continues bidding with its local task ledger; restoring the link exchanges ledgers and resolves conflicting task owners.
+- The Results view (`E`) reads the experiment summaries saved under `results/`; it displays measured values and shows a run command when a suite is missing.
 - Optional localhost UDP mode sends real JSON datagrams for packet-capture demos; agents still run in one process.
 - The window displays the map, vehicles and battery levels, active orders, performance metrics, and a plain-English event feed.
 
@@ -44,7 +46,8 @@ For Wireshark, capture on the Npcap Loopback Adapter with display filter `udp &&
 
 `SPACE` pause | `UP`/`DOWN` speed | `R` new map | `TAB` switch strategy | `S` split screen\
 `1` rush hour | `2` failure storm | `3` blocked road | `4` recovery demo | `D` dispatcher on/off | `H` heartbeats in feed\
-`A` auction bids (browse with `LEFT`/`RIGHT`, close with `A`, `ESC`, or click)\
+`A` inspect bids and score inputs | `E` experiment results | `P` partition/restore auction network\
+`T` switch between plain-English and technical message feeds\
 `C` cancel the oldest order still waiting for assignment\
 Click a vehicle to fail it | right-click a cell to block it | `ESC` quit
 
@@ -54,13 +57,15 @@ Click a vehicle to fail it | right-click a cell to block it | `ESC` quit
 python experiments/run_experiments.py --suite sweep
 python experiments/run_experiments.py --suite main
 python experiments/make_charts.py --suite main
+python experiments/run_experiments.py --suite paired-partition
+python experiments/make_charts.py --suite paired-partition
 ```
 
 Results are written to `results/<suite>/` as run data, summaries, settings, and charts.
 
 ## Assumptions and current limitations
 
-Vehicle speed, battery capacity and consumption, charging rate, order arrival rate, and the one-minute-per-tick deadline clock are configurable simulation assumptions; they are not calibrated against real fleet or city data. Agents, world, and renderer run in one program. The default network is simulated; `--udp` sends optional loopback datagrams but does not separate agents into processes or model a production network. Vehicles may share a map cell, failures are permanent, chargers have unlimited capacity, and a failed vehicle's parcel location is approximated using its last heartbeat position. The central baselines do not include communication costs. These limits should be stated when presenting results.
+Vehicle speed, battery capacity and consumption, charging rate, order arrival rate, and the one-minute-per-tick deadline clock are configurable simulation assumptions; they are not calibrated against real fleet or city data. Agents, world, and renderer run in one program. The default network is simulated; `--udp` sends optional loopback datagrams but does not separate agents into processes or model a production network. The partition control simulates communication loss between groups, not a real network outage. Ledger reconciliation is deterministic simulation logic and is not a formal distributed-consensus protocol. Vehicles may share a map cell, failures are permanent, chargers have unlimited capacity, and a failed vehicle's parcel location is approximated using its last heartbeat position. The central baselines do not include communication costs. These limits should be stated when presenting results.
 
 ## Main files
 

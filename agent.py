@@ -20,8 +20,8 @@ OWN ledger, raises their epoch and re-auctions them. No leader is involved.
 """
 
 import config
-from communication import (AGENT_FAILURE, BROADCAST, DELIVERY_COMPLETE, HEARTBEAT, TASK_ACCEPT, TASK_BID,
-                           TASK_CANCEL, TASK_REASSIGN, TASK_REQUEST)
+from communication import (AGENT_FAILURE, BROADCAST, DELIVERY_COMPLETE, HEARTBEAT, SYNC_STATE, TASK_ACCEPT,
+                           TASK_BID, TASK_CANCEL, TASK_REASSIGN, TASK_REQUEST, Message)
 from pathfinding import astar
 from task import TaskInfo
 
@@ -60,6 +60,9 @@ class Agent:
         self.path_target = None             # the goal that `path` leads to
         self._length_cache = {}             # (start, goal) -> A* length, cleared on map changes
         self.replans = 0                    # how many times I had to compute a new route
+        self.route_reroutes = 0             # path was invalidated by a newly blocked road
+        self.successful_reroutes = 0
+        self._reroute_pending = False
         self.last_heard = {pid: 0 for pid in (peer_ids or [])}   # peer -> last tick I heard from it
         self.peer_info = {}                 # peer -> its last heartbeat (position, carrying, ...)
         self.suspected_dead = set()         # peers I believe have failed
@@ -98,6 +101,8 @@ class Agent:
         self.known_obstacles.add(cell)
         self._length_cache.clear()
         if cell in self.path:
+            self.route_reroutes += 1
+            self._reroute_pending = True
             self.path = []                                # forces a new A* route next step
 
     def path_length(self, start, goal, env):
@@ -151,8 +156,13 @@ class Agent:
         return distance, position, distance_to_candidate
 
     def compute_bid(self, task, env):
+        """Return the scalar auction score, or None when I cannot safely bid."""
+        details = self.compute_bid_details(task, env)
+        return None if details is None else details["cost"]
+
+    def compute_bid_details(self, task, env):
         """
-        My cost for taking `task` (lower is better), or None if I should NOT bid.
+        Return the real score inputs used for a bid, or None if ineligible.
 
         I do not bid if I am charging, if my queue is full, or if the battery
         cannot cover: everything I already hold + this task + a trip to a charger.
@@ -180,7 +190,17 @@ class Agent:
         delivery_time = delivery / self.speed
         cost = (config.W_TIME * (config.PRIORITY_FACTOR[task.priority] * time_until_pickup + delivery_time)
                 + config.W_LOAD * load)
-        return round(cost, 3)
+        return {
+            "cost": round(cost, 3),
+            "distance_to_pickup": distance_to_pickup,
+            "delivery_distance": delivery,
+            "pickup_time": time_until_pickup,
+            "delivery_time": delivery_time,
+            "load": load,
+            "priority_factor": config.PRIORITY_FACTOR[task.priority],
+            "battery_pct": round(100 * self.battery / config.BATTERY_MAX, 1),
+            "energy_required_with_reserve": round(energy_needed * (1 + config.SAFETY_MARGIN), 2),
+        }
 
     # ---------- the agent's "brain": called once per tick ----------
     def update(self, env, tick):
@@ -213,7 +233,7 @@ class Agent:
         for _ in range(self.speed):
             if self.position == target:
                 break
-            self._step_along_path(target, env)
+            self._step_along_path(target, env, tick)
             if self.battery <= 0:
                 self.battery = 0
                 self.fail("BATTERY", tick)
@@ -239,6 +259,7 @@ class Agent:
                 entry = self.ledger.get(payload["task_id"])
                 if entry is not None:
                     entry["status"] = DONE
+                    entry["completed_tick"] = message.tick_sent
                 self._drop_task(payload["task_id"])           # someone already delivered it
             elif message.msg_type == TASK_CANCEL:
                 self._on_cancel(payload)
@@ -250,6 +271,8 @@ class Agent:
                     self._declare_failed(failed_id, env, tick, announce=False)
             elif message.msg_type == TASK_REASSIGN:
                 self._on_reassign(payload, env, tick)
+            elif message.msg_type == SYNC_STATE:
+                self._on_sync_state(message, env, tick)
 
     def _open_auction(self, task, epoch, env, tick):
         """Start (or restart) an auction for a task and place my own bid if I can."""
@@ -257,11 +280,13 @@ class Agent:
         if old is not None and epoch <= old["epoch"]:
             return                                        # old or duplicate announcement
         bids = {}
-        my_cost = self.compute_bid(task, env)
-        if my_cost is not None:
+        my_details = self.compute_bid_details(task, env)
+        if my_details is not None:
+            my_cost = my_details["cost"]
             bids[self.agent_id] = my_cost
             self.bus.send(TASK_BID, self.agent_id, BROADCAST, tick,
-                          {"task_id": task.task_id, "epoch": epoch, "cost": my_cost})
+                          {"task_id": task.task_id, "epoch": epoch, "cost": my_cost,
+                           "details": my_details})
         self.ledger[task.task_id] = {"task": task, "epoch": epoch, "owner": None, "cost": None,
                                      "status": BIDDING, "bids": bids,
                                      "decide_at": tick + config.BID_WINDOW}
@@ -286,6 +311,108 @@ class Agent:
                 entry["status"] = CANCELLED
                 entry["owner"] = None
                 self._drop_task(payload["task_id"])
+
+    def broadcast_sync_state(self, tick):
+        """Share only this vehicle's ledger after a network partition is lifted."""
+        if self.bus is None or not self.is_alive():
+            return
+        entries = []
+        for task_id, entry in self.ledger.items():
+            if entry.get("task") is None:
+                continue
+            entries.append({
+                "task": entry["task"], "epoch": entry["epoch"], "owner": entry["owner"],
+                "cost": entry["cost"], "status": entry["status"], "bids": dict(entry["bids"]),
+                "completed_tick": entry.get("completed_tick"),
+                "carrying": (self.assigned_task is not None
+                             and self.assigned_task.task_id == task_id and self.status == DELIVERING),
+            })
+        self.bus.send(SYNC_STATE, self.agent_id, BROADCAST, tick,
+                      {"generation": self.bus.sync_generation, "entries": entries})
+
+    def _on_sync_state(self, message, env, tick):
+        """Merge peer snapshots deterministically; bids/claims remain agent-local evidence."""
+        payload = message.payload
+        if payload.get("generation") != self.bus.sync_generation:
+            return
+        for remote in payload["entries"]:
+            task = remote["task"]
+            task_id, epoch = task.task_id, remote["epoch"]
+            entry = self.ledger.get(task_id)
+            if entry is None:
+                entry = {"task": task, "epoch": epoch, "owner": None, "cost": None,
+                         "status": BIDDING, "bids": {}, "decide_at": tick + 1}
+                self.ledger[task_id] = entry
+            if epoch < entry["epoch"]:
+                continue
+            old_owner = entry["owner"]
+            old_epoch = entry["epoch"]
+
+            if remote["status"] == DONE:
+                entry["task"] = task
+                entry["epoch"] = max(entry["epoch"], epoch)
+                entry["status"] = DONE
+                entry["owner"] = remote["owner"]
+                entry["completed_tick"] = remote.get("completed_tick")
+                self._drop_task(task_id)
+                env.record_delivery(task_id, remote.get("completed_tick") or tick)
+            elif remote["status"] == CANCELLED:
+                if entry["status"] not in (DONE, ASSIGNED):
+                    entry["task"] = task
+                    entry["epoch"] = epoch
+                    entry["status"] = CANCELLED
+                    entry["owner"] = None
+                    self._drop_task(task_id)
+            elif remote["owner"] is not None:
+                if entry["status"] in (DONE, CANCELLED):
+                    continue
+                if epoch > old_epoch:
+                    if entry["owner"] == self.agent_id:
+                        self._drop_task(task_id)
+                    entry.update({"task": task, "epoch": epoch, "owner": None, "cost": None,
+                                  "status": PROVISIONAL, "bids": {}})
+                claim = Message(0, TASK_ACCEPT, remote["owner"], self.agent_id, tick, tick,
+                                {"task_id": task_id, "epoch": epoch, "cost": remote["cost"]})
+                local_carrying = (entry.get("carrying", False)
+                                  or (entry["owner"] == self.agent_id and self.assigned_task is not None
+                                      and self.assigned_task.task_id == task_id and self.status == DELIVERING))
+                remote_carrying = remote.get("carrying", False)
+                if remote_carrying and not local_carrying:
+                    if entry["owner"] == self.agent_id:
+                        self._drop_task(task_id)
+                        if self.assigned_task is not None and self.assigned_task.task_id == task_id:
+                            self.assigned_task = None
+                            self.status = IDLE
+                    entry.update({"task": task, "epoch": epoch, "owner": remote["owner"],
+                                  "cost": remote["cost"], "status": ASSIGNED, "carrying": True})
+                elif local_carrying and not remote_carrying:
+                    entry["carrying"] = True
+                    continue
+                else:
+                    self._on_accept(claim)
+                    entry["carrying"] = remote_carrying if entry["owner"] == remote["owner"] else local_carrying
+                if old_owner == self.agent_id and entry["owner"] != self.agent_id:
+                    if self.assigned_task is not None and self.assigned_task.task_id == task_id:
+                        self.assigned_task = None
+                        self.status = IDLE
+                if entry["owner"] == self.agent_id:
+                    if (self.assigned_task is None or self.assigned_task.task_id != task_id) and not any(
+                            queued.task_id == task_id for queued in self.task_queue):
+                        self.enqueue_task(task)
+                    env.record_assignment(task_id, self.agent_id, tick,
+                                          recovery_approach_distance=self.path_length(self.position, task.pickup, env))
+                if old_owner is not None and entry["owner"] != old_owner:
+                    self.bus.note_event("SYNC_CONFLICT", {"task_id": task_id, "owner_id": entry["owner"],
+                                                           "previous_owner_id": old_owner}, tick,
+                                        once_key=("sync-conflict", self.bus.sync_generation, task_id, epoch))
+            elif entry["owner"] is None and entry["status"] not in (DONE, CANCELLED):
+                if epoch > old_epoch:
+                    entry.update({"task": task, "epoch": epoch, "status": BIDDING, "owner": None,
+                                  "cost": None, "bids": dict(remote["bids"]), "decide_at": tick + 1})
+                elif entry["status"] == BIDDING and remote["status"] == BIDDING:
+                    entry["bids"].update(remote["bids"])
+                    entry["decide_at"] = min(entry.get("decide_at", tick + 1), tick + 1)
+        self.bus.note_sync_processed(self.agent_id, message.sender_id, tick)
 
     def _run_auction_timers(self, env, tick):
         """Close auctions whose bid window ended, and restart ones that stalled."""
@@ -336,7 +463,7 @@ class Agent:
         """
         payload = message.payload
         entry = self.ledger.get(payload["task_id"])
-        if entry is None or entry["status"] == CANCELLED or payload["epoch"] < entry["epoch"]:
+        if entry is None or entry["status"] in (DONE, CANCELLED) or payload["epoch"] < entry["epoch"]:
             return
         claim = (payload["cost"], message.sender_id)
         if payload["epoch"] == entry["epoch"] and entry["owner"] is not None:
@@ -463,6 +590,7 @@ class Agent:
                 epoch = entry["epoch"] if entry is not None else 1
                 if entry is not None:
                     entry["status"] = DONE
+                    entry["completed_tick"] = tick
                 self.bus.send(DELIVERY_COMPLETE, self.agent_id, BROADCAST, tick,
                               {"task_id": task.task_id, "epoch": epoch})
             self.assigned_task = None
@@ -476,7 +604,7 @@ class Agent:
         if self.battery >= config.CHARGE_TARGET:
             self.status = IDLE
 
-    def _step_along_path(self, target, env):
+    def _step_along_path(self, target, env, tick=None):
         """
         Walk one cell towards `target` along an A* route.
         A new route is computed when the target changed, or when the next cell
@@ -487,6 +615,13 @@ class Agent:
             self.replans += 1
             self.path = route or []
             self.path_target = target
+            if self._reroute_pending and route:
+                self.successful_reroutes += 1
+                self._reroute_pending = False
+                if self.bus is not None:
+                    self.bus.note_event("REROUTE_SUCCESS", {"agent_id": self.agent_id, "target": target},
+                                        0 if tick is None else tick,
+                                        once_key=("reroute", self.agent_id, self.route_reroutes))
             if not self.path:
                 return                                    # no route right now: wait
         self._move_to(self.path.pop(0))

@@ -36,6 +36,12 @@
 
 Deadline metrics use `MINUTES_PER_TICK = 1` and `DELIVERY_DEADLINE_MINUTES = 90` by default. This is an illustrative conversion, not a calibrated travel-time model. Recovery distance against a no-failure counterfactual is not currently reported. Battery energy is measured in abstract model units, not calibrated electrical units. Computation time is reported only by the `paired-scale` suites.
 
+## Final integration metrics and results view
+
+The live panel also reports task orders affected by a vehicle failure and the fraction later delivered, recovery approach distance, route reroutes needed and completed, and network state. Network experiment summaries include partitioned messages, partition count, restorations, synchronization completions, and ownership conflicts. These counts describe this simulator's event model; they are not network throughput or consensus guarantees.
+
+Press `E` to inspect saved CSV summaries in the app. Tabs show deadline scenarios, scale results, recovery-related outcomes, and network partition comparisons. Values come from `results/<suite>/summary.csv`; absent files display the command to create the suite. Means and standard deviations are shown when saved in the CSV. For the network experiment, run `python experiments/run_experiments.py --suite paired-partition`, then `python experiments/make_charts.py --suite paired-partition`.
+
 ## Baselines
 
 - **B1:** central dispatcher assigns each waiting task to the nearest idle agent. It does not apply the auction battery feasibility rule and does not recover failed-owner tasks.
