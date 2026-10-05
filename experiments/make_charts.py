@@ -53,6 +53,10 @@ PANELS = {
                          ("avg_delivery", "Average delivery time (ticks)", ALL),
                          ("battery_failures", "Battery failures", ALL),
                          ("messages_sent", "Messages sent", ["AUCTION"])],
+    "auction_consistency": [("auction_conflict_rate", "Fraction of accepted auctions with conflicting claims", ["AUCTION"]),
+                            ("conflicted_auctions", "Auctions with multiple accept claims", ["AUCTION"]),
+                            ("unaccepted_auctions", "Auctions with no observed accept claim", ["AUCTION"]),
+                            ("messages_sent", "Messages sent", ["AUCTION"])],
 }
 
 
@@ -127,7 +131,8 @@ def xlabel(experiment):
             "dispatcher_outage": "Dispatcher outage at tick 300", "message_loss": "Message loss probability",
             "timeout_sweep": "Failure timeout (ticks)", "scale_agents": "Number of vehicles",
             "scale_tasks": "Fixed number of orders", "scale_obstacles": "Obstacle density",
-            "stress_scenarios": "Predefined stress scenario"}[experiment]
+            "stress_scenarios": "Predefined stress scenario",
+            "auction_consistency": "Message loss probability"}[experiment]
 
 
 def main():

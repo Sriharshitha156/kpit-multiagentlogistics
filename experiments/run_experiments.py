@@ -36,11 +36,14 @@ MAIN_SEEDS = list(range(1001, 1011))     # fresh test seeds (never used while tu
 SWEEP_SEEDS = list(range(2001, 2006))    # tuning seeds, used only for the timeout sweep
 QUICK_SEEDS = [1, 2]
 SCALE_SEEDS = [3001, 3002, 3003]
+CONSENSUS_SEEDS = [4001, 4002, 4003, 4004, 4005]
 
 METRICS = ["created", "completed", "completion_rate", "lost", "waiting", "avg_delivery", "reassigned",
            "avg_reassign_time", "avg_detection_latency", "false_suspicions", "battery_failures",
            "failed_agents", "utilization", "total_distance", "messages_sent", "messages_delivered",
            "heartbeat_sent", "msgs_per_completed"]
+AUCTION_AUDIT_METRICS = ["accepted_auctions", "conflicted_auctions", "unaccepted_auctions",
+                         "auction_conflict_rate"]
 KEY_FIELDS = ["experiment", "group", "x", "strategy", "seed"]
 
 
@@ -112,6 +115,13 @@ def stress_experiments():
                 lambda label, group: cases[label]())]
 
 
+def consensus_experiments():
+    return [exp("auction_consistency", "message loss probability", [0.0, 0.05, 0.10, 0.20, 0.35, 0.50],
+                lambda loss, group: scenario(num_agents=12, failures=2, task_count=60,
+                                             overrides={"LOSS_PROBABILITY": loss}),
+                strategies=["AUCTION"])]
+
+
 SUITES = {"main": (main_experiments, MAIN_SEEDS, 1500),
           "sweep": (sweep_experiments, SWEEP_SEEDS, 1500),
           "quick": (quick_experiments, QUICK_SEEDS, 500),
@@ -122,7 +132,8 @@ SUITES = {"main": (main_experiments, MAIN_SEEDS, 1500),
           "paired-scale": (scale_experiments, SCALE_SEEDS, 600),
           # Fresh folder for a clean, reviewable result set, separate from prior runs.
           "paired-scale-clean": (scale_experiments, SCALE_SEEDS, 600),
-          "paired-stress": (stress_experiments, SCALE_SEEDS, 600)}
+          "paired-stress": (stress_experiments, SCALE_SEEDS, 600),
+          "paired-consensus": (consensus_experiments, CONSENSUS_SEEDS, 600)}
 
 
 def make_jobs(experiments, seeds):
@@ -207,6 +218,9 @@ def run_job(job, ticks):
     })
     if job.get("track_runtime"):
         row["compute_seconds"] = compute_seconds
+    if job.get("track_auction_audit"):
+        for metric in AUCTION_AUDIT_METRICS:
+            row[metric] = m[metric]
     return row
 
 
@@ -262,6 +276,8 @@ def main():
             job["paired_tasks"] = True
             if args.suite.startswith("paired-scale"):
                 job["track_runtime"] = True
+            if args.suite == "paired-consensus":
+                job["track_auction_audit"] = True
     done = {job_key(r) for r in read_rows(raw_path)}
     todo = [j for j in jobs if job_key(j) not in done]
     print("suite=%s  ticks=%d  seeds=%d  runs: %d total, %d already done" % (args.suite, ticks, len(seeds), len(jobs), len(done)))
@@ -270,10 +286,12 @@ def main():
         json.dump({"suite": args.suite, "ticks": ticks, "seeds": seeds, "fail_tick": FAIL_TICK,
                    "started": time.strftime("%Y-%m-%d %H:%M:%S"),
                    "task_schedule": "precomputed and replayed per seed and scenario" if args.suite.startswith("paired-") else "live random arrivals",
-                   "fixed_task_counts": args.suite.startswith("paired-scale"),
+                   "fixed_task_counts": args.suite.startswith(("paired-scale", "paired-consensus")),
+                   "auction_audit": args.suite == "paired-consensus",
                    "config": {k: getattr(config, k) for k in dir(config) if k.isupper() and k != "PRIORITY_FACTOR"}}, f, indent=2)
 
-    report_metrics = METRICS + (["compute_seconds"] if args.suite.startswith("paired-scale") else [])
+    report_metrics = (METRICS + (["compute_seconds"] if args.suite.startswith("paired-scale") else [])
+                      + (AUCTION_AUDIT_METRICS if args.suite == "paired-consensus" else []))
     fields = KEY_FIELDS + report_metrics
     new_file = not os.path.exists(raw_path)
     start = time.time()

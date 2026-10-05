@@ -32,6 +32,10 @@ def summarize(sim):
 
     messages_sent = sim.bus.messages_sent if sim.bus is not None else 0
     messages_delivered = sim.bus.messages_delivered if sim.bus is not None else 0
+    auction_records = sim.bus.auction_history if sim.bus is not None else []
+    accepted_auctions = [record for record in auction_records if record["accepts"]]
+    conflicted_auctions = sum(1 for record in accepted_auctions if len(record["accepts"]) > 1)
+    unaccepted_auctions = sum(1 for record in auction_records if not record["accepts"])
 
     return {
         "created": len(tasks),
@@ -55,4 +59,8 @@ def summarize(sim):
         "messages_sent": messages_sent,
         "messages_delivered": messages_delivered,
         "messages_per_completed_task": (messages_sent / len(completed)) if completed else None,
+        "accepted_auctions": len(accepted_auctions),
+        "conflicted_auctions": conflicted_auctions,
+        "unaccepted_auctions": unaccepted_auctions,
+        "auction_conflict_rate": conflicted_auctions / len(accepted_auctions) if accepted_auctions else None,
     }

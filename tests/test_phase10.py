@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(ROOT, "experiments"))
 import config
 import run_experiments as runner
 from simulation import Simulation
+from metrics import summarize
 
 
 class TestRunner(unittest.TestCase):
@@ -78,6 +79,19 @@ class TestRunner(unittest.TestCase):
         self.assertEqual(by_label["Emergency orders"]["task_priority"], 3)
         self.assertEqual(by_label["Low battery"]["initial_battery"], 35)
         self.assertEqual(by_label["Large fleet"]["num_agents"], 100)
+
+    def test_auction_conflict_metrics_use_distinct_accept_claims(self):
+        sim = Simulation(seed=9, num_agents=3, strategy="AUCTION")
+        sim.bus.auction_history = [
+            {"accepts": {1: 2.0}},
+            {"accepts": {1: 4.0, 2: 3.5}},
+            {"accepts": {}},
+        ]
+        result = summarize(sim)
+        self.assertEqual(result["accepted_auctions"], 2)
+        self.assertEqual(result["conflicted_auctions"], 1)
+        self.assertEqual(result["unaccepted_auctions"], 1)
+        self.assertEqual(result["auction_conflict_rate"], 0.5)
 
     def test_aggregate_computes_mean_and_std(self):
         rows = [{"experiment": "e", "group": "", "x": "1", "strategy": "B2", "seed": s,

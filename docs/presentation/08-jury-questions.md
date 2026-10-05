@@ -32,7 +32,7 @@ The paired scalability batch tested 100 agents, 50 scheduled orders, 10 seeded f
 
 ## What if communication overhead is high?
 
-The bus counts generated transmissions and recipient deliveries, and supports configurable delay and message loss. It does not model bandwidth, congestion, or actual network resource limits. Results under message loss are only a first-order simulation study.
+The bus counts generated transmissions and recipient deliveries, and supports configurable delay and message loss. In a five-seed sweep, 20% message loss produced about 13% conflicting accepted auctions; at 50% loss, about 54 auctions per run had no observed accept claim. The latter also explains why the conflict fraction falls slightly at 50%: fewer auctions reached any acceptance. The bus does not model bandwidth, congestion, or actual network resource limits, and its global audit cannot prove what each agent received. This is a first-order simulation study, not a distributed-consensus guarantee.
 
 ## What proves the approach works?
 

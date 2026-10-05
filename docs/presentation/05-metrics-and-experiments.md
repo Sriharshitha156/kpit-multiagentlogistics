@@ -23,6 +23,9 @@
 | Messages sent | Bus transmissions | A broadcast counts once |
 | Messages delivered | Recipient copies delivered by the bus | Broadcast counts once per recipient; lost messages excluded |
 | Messages per completed task | Sent transmissions divided by completed deliveries | Undefined when nothing completed |
+| Conflicted auctions | Auction records with accept claims from more than one agent | Based on transmitted claims observed by the simulator-wide audit log |
+| Unaccepted auctions | Auction records with no accept claim by end of run | Includes auctions that may still be pending at the end |
+| Auction conflict rate | Conflicted auctions divided by auctions with at least one accept claim | Not the fraction of agents that disagreed; audit sees sends, not each agent's inbox |
 
 On-time/late percentage, deadlines, battery consumption, and recovery distance against a no-failure counterfactual are **not** currently reported. Computation time is reported only by the `paired-scale` suite.
 
@@ -83,6 +86,21 @@ This suite uses three seeds and 600 ticks per run, with B1, B2, and AUCTION rece
 One completed batch contains 63 runs (3 strategies × 7 scenarios × 3 seeds):
 
 ![Measured stress-scenario comparison](figures/paired-stress-scenarios.png)
+
+### Message-loss agreement check
+
+Run five-seed tests of the decentralized auction under increasing message loss:
+
+```powershell
+python experiments/run_experiments.py --suite paired-consensus
+python experiments/make_charts.py --suite paired-consensus
+```
+
+Each point uses 12 agents, 60 paired orders, two failures, 600 ticks, and one of six message-loss rates from 0% to 50%. The additional auction audit metrics count multiple transmitted accept claims for the same task and epoch, and requests that finish without any observed accept claim. The bus audit sees transmissions globally; it cannot show exactly which messages each agent received or prove a real distributed consensus guarantee.
+
+The completed 30-run batch showed 0% conflicting accepted auctions at 0% message loss, about 13% at 20% loss, and about 20% at 35% loss. At 50% loss the conflict rate was about 17%, but auctions with no observed accept rose to about 54 per run (from 3 with no loss). That lower conflict rate at 50% is not an improvement: fewer auctions got any accept claim. Completion also fell from about 94% to 87%. These are five-seed simulation averages, not a consensus guarantee.
+
+![Auction agreement under message loss](figures/paired-auction-consistency.png)
 
 ### What “paired requests” means
 
