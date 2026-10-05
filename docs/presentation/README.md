@@ -4,7 +4,7 @@ Use these short guides to prepare the demo or answer technical questions. They d
 
 ## Roadmap status
 
-The requested Phase 0–16 implementation checklist is complete, including the strict reviewer pass. Phase 15 has 76 automated tests. The original project brief's unimplemented scope is still stated plainly: there are no delivery deadlines or on-time/late metrics, and order cancellation has no GUI control. These are product limitations, not features to claim in a presentation.
+The requested Phase 0–16 implementation checklist is complete, including the strict reviewer pass. Deadline reporting and GUI cancellation from the initial pitch are now implemented. State the model assumptions: deadlines default to 90 simulated minutes at one minute per tick, and cancellation applies only before assignment. The test suite currently has 80 tests and covers these behaviors.
 
 1. [Project pitch](01-project-pitch.md) — 30-second and 2-minute explanations.
 2. [Architecture](02-architecture.md) — components, message flow, and where decisions happen.
@@ -17,7 +17,7 @@ The requested Phase 0–16 implementation checklist is complete, including the s
 
 ## Safe headline claim
 
-This is a grid-based, single-process simulation of decentralized EV delivery task allocation. Agents bid using their own state and a simulated message bus; the project compares that approach with two central dispatch baselines. It is not a real-city deployment, deadline service, or networked fleet.
+This is a grid-based, single-process simulation of decentralized EV delivery task allocation. Agents bid using their own state and a simulated message bus; the project compares that approach with two central dispatch baselines and records deadline outcomes using configurable simulation assumptions. It is not a real-city deployment or networked fleet.
 
 ## Before presenting results
 

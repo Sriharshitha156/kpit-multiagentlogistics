@@ -410,7 +410,8 @@ class Agent:
         pickup = task.pickup
         if info is not None and info.get("carrying") == task.task_id:
             pickup = info["position"]
-        return TaskInfo(task.task_id, pickup, task.destination, task.priority, task.created_tick)
+        return TaskInfo(task.task_id, pickup, task.destination, task.priority, task.created_tick,
+                        task.deadline_tick)
 
     def _on_reassign(self, payload, env, tick):
         """Someone re-opened a task. Ignore it if I already know that epoch; otherwise join the auction."""

@@ -10,7 +10,7 @@ Our project explores decentralized task allocation for an electric delivery flee
 
 Vehicles route around obstacles using grid-based A*. Battery decreases with movement, and idle low-battery vehicles travel to a charging station. Agents send heartbeats. When a peer is silent long enough, surviving agents can mark it failed and re-auction its unfinished work. A split-screen view compares the auction fleet with central dispatch strategies.
 
-The purpose is to study coordination, recovery, and trade-offs under controlled simulation conditions. It does not use a real city map, real delivery data, real network sockets, or delivery deadlines. Its numbers are simulation results under configurable assumptions.
+The purpose is to study coordination, recovery, deadlines, and trade-offs under controlled simulation conditions. The default 90-minute delivery window uses an illustrative one-minute-per-tick clock; the model does not use real city maps or delivery data, and its numbers are simulation results under configurable assumptions.
 
 ## One-sentence problem statement
 

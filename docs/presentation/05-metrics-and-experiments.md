@@ -6,6 +6,11 @@
 |---|---|---|
 | Created | Number of tasks spawned | Tasks |
 | Completed | Tasks whose status is `COMPLETED` | Tasks |
+| On time | Completed tasks whose delivery tick is on or before `deadline_tick` | Tasks; deadlines default to 90 simulated minutes |
+| Late | Completed tasks whose delivery tick is after `deadline_tick` | Tasks; unfinished overdue tasks are counted separately |
+| Overdue unfinished | Open, assigned, or picked-up tasks past deadline at the current tick | Tasks; cancelled tasks are excluded |
+| On-time rate | On-time completed tasks divided by completed tasks | Ratio; undefined when none are completed |
+| Cancelled | Orders withdrawn while still open | Tasks |
 | Waiting | Tasks whose status is `OPEN` | Tasks at the current end of run |
 | Lost | Assigned/picked-up tasks whose current owner has failed | Current snapshot, not all failures over time |
 | Average delivery time | Mean of `completed_tick - created_tick` for completed tasks | Simulation ticks; excludes unfinished tasks |
@@ -29,7 +34,7 @@
 | Unaccepted auctions | Auction records with no accept claim by end of run | Includes auctions that may still be pending at the end |
 | Auction conflict rate | Conflicted auctions divided by auctions with at least one accept claim | Not the fraction of agents that disagreed; audit sees sends, not each agent's inbox |
 
-On-time/late percentage, deadlines, and recovery distance against a no-failure counterfactual are **not** currently reported. Battery energy is measured in abstract model units, not calibrated electrical units. Computation time is reported only by the `paired-scale` suites.
+Deadline metrics use `MINUTES_PER_TICK = 1` and `DELIVERY_DEADLINE_MINUTES = 90` by default. This is an illustrative conversion, not a calibrated travel-time model. Recovery distance against a no-failure counterfactual is not currently reported. Battery energy is measured in abstract model units, not calibrated electrical units. Computation time is reported only by the `paired-scale` suites.
 
 ## Baselines
 
@@ -88,6 +93,19 @@ This suite uses three seeds and 600 ticks per run, with B1, B2, and AUCTION rece
 One completed batch contains 63 runs (3 strategies × 7 scenarios × 3 seeds):
 
 ![Measured stress-scenario comparison](figures/paired-stress-scenarios.png)
+
+### Deadline outcome run
+
+Run the deadline-focused copy of the same seven paired scenarios:
+
+```powershell
+python experiments/run_experiments.py --suite paired-deadlines
+python experiments/make_charts.py --suite paired-deadlines
+```
+
+This fresh-output suite reports on-time completed orders, late completed orders, overdue unfinished orders, and on-time share of completed orders. It uses three seeds and a 600-tick horizon. With the default 90-minute deadline, high demand averaged 49.3 completed orders for B1, 96.0 for B2, and 95.0 for AUCTION out of 100 arrivals. Among completed orders, the mean on-time share was 100% for B1, 100% for B2, and 98.3% for AUCTION. B1's lower completion count means its 100% on-time share must not be read as better overall service: it also ended with 38 overdue unfinished orders on average. These are simulator results under the assumed clock, not a real delivery SLA.
+
+![Deadline results across seven paired scenarios](../../results/paired-deadlines/charts/deadline_scenarios.png)
 
 ### Message-loss agreement check
 

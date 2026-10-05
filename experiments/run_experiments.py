@@ -39,7 +39,8 @@ SCALE_SEEDS = [3001, 3002, 3003]
 CONSENSUS_SEEDS = [4001, 4002, 4003, 4004, 4005]
 ENERGY_SEEDS = [5001, 5002, 5003]
 
-METRICS = ["created", "completed", "completion_rate", "lost", "waiting", "avg_delivery", "reassigned",
+METRICS = ["created", "completed", "completion_rate", "on_time", "late", "overdue_unfinished",
+           "on_time_rate", "lost", "waiting", "avg_delivery", "reassigned",
            "avg_reassign_time", "avg_detection_latency", "false_suspicions", "battery_failures",
            "failed_agents", "utilization", "total_distance", "messages_sent", "messages_delivered",
            "heartbeat_sent", "msgs_per_completed"]
@@ -117,6 +118,13 @@ def stress_experiments():
                 lambda label, group: cases[label]())]
 
 
+def deadline_experiments():
+    """Use the same seven stress conditions, with fresh output and deadline metrics."""
+    experiments = stress_experiments()
+    experiments[0]["name"] = "deadline_scenarios"
+    return experiments
+
+
 def consensus_experiments():
     return [exp("auction_consistency", "message loss probability", [0.0, 0.05, 0.10, 0.20, 0.35, 0.50],
                 lambda loss, group: scenario(num_agents=12, failures=2, task_count=60,
@@ -147,7 +155,9 @@ SUITES = {"main": (main_experiments, MAIN_SEEDS, 1500),
           "paired-scale-clean": (scale_experiments, SCALE_SEEDS, 600),
           "paired-stress": (stress_experiments, SCALE_SEEDS, 600),
           "paired-consensus": (consensus_experiments, CONSENSUS_SEEDS, 600),
-          "paired-energy": (energy_experiments, ENERGY_SEEDS, 600)}
+          "paired-energy": (energy_experiments, ENERGY_SEEDS, 600),
+          # Fresh results for deadline outcomes after the deadline model was added.
+          "paired-deadlines": (deadline_experiments, SCALE_SEEDS, 600)}
 
 
 def make_jobs(experiments, seeds):
@@ -221,6 +231,8 @@ def run_job(job, ticks):
     row.update({
         "created": m["created"], "completed": m["completed"],
         "completion_rate": m["completed"] / m["created"] if m["created"] else None,
+        "on_time": m["on_time"], "late": m["late"],
+        "overdue_unfinished": m["overdue_unfinished"], "on_time_rate": m["on_time_rate"],
         "lost": m["lost"], "waiting": m["waiting"], "avg_delivery": m["average_delivery_time"],
         "reassigned": m["reassigned_tasks"], "avg_reassign_time": m["avg_reassignment_time"],
         "avg_detection_latency": m["avg_detection_latency"], "false_suspicions": m["false_suspicions"],

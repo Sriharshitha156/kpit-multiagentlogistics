@@ -17,7 +17,8 @@ def _pack(value):
     if isinstance(value, TaskInfo):
         return {"__kind__": "TaskInfo", "task_id": value.task_id,
                 "pickup": _pack(value.pickup), "destination": _pack(value.destination),
-                "priority": value.priority, "created_tick": value.created_tick}
+                "priority": value.priority, "created_tick": value.created_tick,
+                "deadline_tick": value.deadline_tick}
     if isinstance(value, tuple):
         return {"__kind__": "tuple", "items": [_pack(item) for item in value]}
     if isinstance(value, dict):
@@ -36,7 +37,8 @@ def _unpack(value):
             return tuple(_unpack(item) for item in value["items"])
         if kind == "TaskInfo":
             return TaskInfo(value["task_id"], _unpack(value["pickup"]),
-                            _unpack(value["destination"]), value["priority"], value["created_tick"])
+                            _unpack(value["destination"]), value["priority"], value["created_tick"],
+                            value.get("deadline_tick"))
         return {key: _unpack(item) for key, item in value.items()}
     return value
 

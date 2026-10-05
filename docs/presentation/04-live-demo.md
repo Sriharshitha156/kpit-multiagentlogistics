@@ -29,7 +29,11 @@ In Wireshark, capture on the Npcap Loopback Adapter and use the display filter `
 
 ### Cancelling an order (developer demo)
 
-An order can be cancelled while it is still waiting for a vehicle. In Python, call `sim.cancel_task(task_id)`: it returns `True` when the order is cancelled and `False` if the task is missing or has already left the waiting state. In auction mode, the desk broadcasts `TASK_CANCEL` and each vehicle marks that order cancelled in its local ledger. The interactive screen does not currently have a cancel button.
+An order can be cancelled while it is still waiting for a vehicle. Press `C` or click **Cancel order** to withdraw the oldest waiting order. In split-screen mode the matching order is cancelled in both views. In Python, call `sim.cancel_task(task_id)`: it returns `True` if cancelled and `False` if the task is missing or has already left the waiting state. Auction mode broadcasts `TASK_CANCEL` so vehicles clear their local ledger.
+
+### Showing deadline results
+
+The panel reports completed orders on time versus late, plus waiting orders already past their deadline. By default an order is due 90 simulated minutes after arrival and one tick represents one minute. This conversion is an assumption for the demo, not a real-city travel-time calibration.
 
 ## Four-minute walkthrough
 

@@ -1,10 +1,11 @@
-"""
-task.py - Task (ground truth) and TaskInfo (what agents are allowed to know).
+"""task.py - Task (ground truth) and TaskInfo (what agents are allowed to know).
 
 DESIGN RULE: a Task object is the world's "ground truth". Only the environment
 and the metrics code use it. Agents only ever receive a TaskInfo: a plain copy
 of the task's description, carried inside messages.
 """
+
+import config
 
 # Task statuses (OPEN tasks may be cancelled before assignment.)
 OPEN = "OPEN"
@@ -23,23 +24,27 @@ HIGH = 3
 class TaskInfo:
     """A plain description of a delivery. This is what travels inside messages."""
 
-    def __init__(self, task_id, pickup, destination, priority, created_tick):
+    def __init__(self, task_id, pickup, destination, priority, created_tick, deadline_tick=None):
         self.task_id = task_id
         self.pickup = pickup                  # (x, y) cell
         self.destination = destination        # (x, y) cell
         self.priority = priority              # LOW, MEDIUM or HIGH
         self.created_tick = created_tick
+        deadline_ticks = max(1, round(config.DELIVERY_DEADLINE_MINUTES / config.MINUTES_PER_TICK))
+        self.deadline_tick = created_tick + deadline_ticks if deadline_tick is None else deadline_tick
 
 
 class Task:
     """One delivery: pick a parcel up at `pickup` and drop it at `destination`."""
 
-    def __init__(self, task_id, pickup, destination, priority, created_tick):
+    def __init__(self, task_id, pickup, destination, priority, created_tick, deadline_tick=None):
         self.task_id = task_id
         self.pickup = pickup
         self.destination = destination
         self.priority = priority
         self.created_tick = created_tick
+        deadline_ticks = max(1, round(config.DELIVERY_DEADLINE_MINUTES / config.MINUTES_PER_TICK))
+        self.deadline_tick = created_tick + deadline_ticks if deadline_tick is None else deadline_tick
         self.status = OPEN
         self.owner_id = None                  # which agent owns it (for metrics only)
         self.epoch = 1                        # goes up each time the task is re-auctioned
@@ -53,4 +58,5 @@ class Task:
 
     def describe(self):
         """Make the plain copy that can be sent to agents."""
-        return TaskInfo(self.task_id, self.pickup, self.destination, self.priority, self.created_tick)
+        return TaskInfo(self.task_id, self.pickup, self.destination, self.priority, self.created_tick,
+                        self.deadline_tick)

@@ -26,6 +26,8 @@ WANDER_WHEN_IDLE = False    # Phase 5 demo behaviour; False = idle agents wait w
 # ---------- Tasks ----------
 TASK_SPAWN_PROBABILITY = 0.08   # chance per tick that a new delivery request appears
 MAX_OPEN_TASKS = 30             # safety cap so the screen never floods with waiting tasks
+MINUTES_PER_TICK = 1            # illustrative time scale; not calibrated to a real fleet
+DELIVERY_DEADLINE_MINUTES = 90  # default promised delivery window in simulated minutes
 
 # ---------- Which allocation strategy runs ----------
 STRATEGY = "AUCTION"        # "B1" central nearest-idle | "B2" central with our cost + battery rule | "AUCTION" decentralized

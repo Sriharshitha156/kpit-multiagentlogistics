@@ -80,6 +80,11 @@ class TestRunner(unittest.TestCase):
         self.assertEqual(by_label["Low battery"]["initial_battery"], 35)
         self.assertEqual(by_label["Large fleet"]["num_agents"], 100)
 
+    def test_deadline_suite_reports_deadline_metrics(self):
+        jobs = runner.make_jobs(runner.deadline_experiments(), [1])
+        self.assertEqual({job["experiment"] for job in jobs}, {"deadline_scenarios"})
+        self.assertIn("on_time_rate", runner.METRICS)
+
     def test_auction_conflict_metrics_use_distinct_accept_claims(self):
         sim = Simulation(seed=9, num_agents=3, strategy="AUCTION")
         sim.bus.auction_history = [

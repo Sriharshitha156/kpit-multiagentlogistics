@@ -85,6 +85,7 @@ class TestMessageFeed(unittest.TestCase):
             self.assertEqual(first.msg_type, TASK_REQUEST)
             self.assertEqual(first.payload["task"].pickup, (2, 3))
             self.assertEqual(second.payload["task"].destination, (8, 9))
+            self.assertEqual(second.payload["task"].deadline_tick, task.deadline_tick)
             self.assertNotEqual(bus.udp_endpoints[1], bus.udp_endpoints[2])
             self.assertEqual((bus.messages_sent, bus.messages_delivered), (1, 2))
         finally:

@@ -74,6 +74,14 @@ class TestWindow(unittest.TestCase):
         self.app.handle_event(click(self.button_centre("rush")))
         self.assertGreater(len(self.app.sims[0].env.tasks), before)
 
+    def test_cancel_button_withdraws_oldest_open_order_in_each_view(self):
+        self.app.act("rush")
+        first_id = self.app.sims[0].env.tasks[0].task_id
+        self.assertTrue(next(button for _, button in self.app.button_rects()
+                             if button["action"] == "cancel")["enabled"])
+        self.app.handle_event(key(pygame.K_c, "c"))
+        self.assertEqual(self.app.sims[0].env.task_by_id[first_id].status, "CANCELLED")
+
     def test_clicking_a_vehicle_fails_it(self):
         agent = self.app.sims[0].agents[0]
         view = ui.single_view()

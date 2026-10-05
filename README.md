@@ -13,7 +13,7 @@ This project is a **simulation**, not a deployed delivery service or a model tra
 ## What the demo shows
 
 - Eight electric-vehicle agents coordinate delivery tasks using decentralized auctions.
-- Battery feasibility, charging stations, task capacity, and route planning affect which vehicle can take a job. Delivery deadlines are not implemented.
+- Battery feasibility, charging stations, task capacity, route planning, and task deadlines affect measured outcomes. The default deadline clock is configurable and illustrative.
 - Rush-hour order bursts, blocked roads, and vehicle failures can be triggered during a run.
 - Heartbeats help agents detect failed peers; the surviving fleet can reclaim orphaned deliveries.
 - Split-screen mode compares the auction fleet with central dispatch strategies (nearest idle and a battery-aware dispatcher).
@@ -26,7 +26,7 @@ At the start of the day, a customer places a delivery order. Nearby vans check t
 
 ## What we measure
 
-The simulator records completed, waiting, and lost deliveries; average delivery time in simulation ticks; vehicle failures and battery failures; battery energy used and charged; task reassignment and recovery time; fleet utilization; and message traffic. The experiment scripts run repeatable comparisons across seeds and export CSV summaries and charts. Deadline-based on-time and late percentages are not implemented.
+The simulator records completed, waiting, lost, cancelled, on-time, late, and overdue deliveries; average delivery time; vehicle failures; battery energy used and charged; task reassignment and recovery time; fleet utilization; and message traffic. The default deadline is 90 simulated minutes at one minute per tick, an illustrative assumption rather than a real travel-time calibration. Experiment scripts run repeatable comparisons across seeds and export CSV summaries and charts.
 
 ## Run it
 
@@ -45,6 +45,7 @@ For Wireshark, capture on the Npcap Loopback Adapter with display filter `udp &&
 `SPACE` pause | `UP`/`DOWN` speed | `R` new map | `TAB` switch strategy | `S` split screen\
 `1` rush hour | `2` failure storm | `3` blocked road | `4` recovery demo | `D` dispatcher on/off | `H` heartbeats in feed\
 `A` auction bids (browse with `LEFT`/`RIGHT`, close with `A`, `ESC`, or click)\
+`C` cancel the oldest order still waiting for assignment\
 Click a vehicle to fail it | right-click a cell to block it | `ESC` quit
 
 ## Experiments
@@ -59,7 +60,7 @@ Results are written to `results/<suite>/` as run data, summaries, settings, and 
 
 ## Assumptions and current limitations
 
-Vehicle speed, battery capacity and consumption, charging rate, and order arrival rate are configurable simulation assumptions; they are not calibrated against real fleet or city data. The model has task priorities but no delivery deadlines. Agents, world, and renderer run in one program. The default network is simulated; `--udp` sends optional loopback datagrams but does not separate agents into processes or model a production network. Vehicles may share a map cell, failures are permanent, chargers have unlimited capacity, and a failed vehicle's parcel location is approximated using its last heartbeat position. The central baselines do not include communication costs. These limits should be stated when presenting results.
+Vehicle speed, battery capacity and consumption, charging rate, order arrival rate, and the one-minute-per-tick deadline clock are configurable simulation assumptions; they are not calibrated against real fleet or city data. Agents, world, and renderer run in one program. The default network is simulated; `--udp` sends optional loopback datagrams but does not separate agents into processes or model a production network. Vehicles may share a map cell, failures are permanent, chargers have unlimited capacity, and a failed vehicle's parcel location is approximated using its last heartbeat position. The central baselines do not include communication costs. These limits should be stated when presenting results.
 
 ## Main files
 

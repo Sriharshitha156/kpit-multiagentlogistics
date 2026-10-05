@@ -118,6 +118,30 @@ class TestProjectEdgeCases(unittest.TestCase):
         self.assertFalse(sim.cancel_task(task.task_id))
         self.assertNotEqual(task.status, CANCELLED)
 
+    def test_deadline_metrics_separate_on_time_late_and_overdue(self):
+        sim = Simulation(seed=13, num_agents=1, strategy="B1")
+        on_time = sim.new_task()
+        on_time.deadline_tick = 10
+        sim.env.record_delivery(on_time.task_id, 9)
+        late = sim.new_task()
+        late.deadline_tick = 10
+        sim.env.record_delivery(late.task_id, 11)
+        overdue = sim.new_task()
+        overdue.deadline_tick = 5
+        sim.tick = 6
+
+        metrics = summarize(sim)
+        self.assertEqual(metrics["on_time"], 1)
+        self.assertEqual(metrics["late"], 1)
+        self.assertEqual(metrics["overdue_unfinished"], 1)
+        self.assertEqual(metrics["on_time_rate"], 0.5)
+
+    def test_rescue_preserves_original_deadline(self):
+        sim = Simulation(seed=14, num_agents=2, strategy="AUCTION")
+        task = sim.new_task()
+        rescue = sim.agents[0]._rescue_task(task.describe(), 2)
+        self.assertEqual(rescue.deadline_tick, task.deadline_tick)
+
 
 if __name__ == "__main__":
     unittest.main()

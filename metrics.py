@@ -14,6 +14,10 @@ def summarize(sim):
     failed_ids = {a.agent_id for a in sim.agents if a.status == FAILED}
 
     completed = [t for t in tasks if t.status == COMPLETED]
+    on_time = [t for t in completed if t.completed_tick <= t.deadline_tick]
+    late = [t for t in completed if t.completed_tick > t.deadline_tick]
+    overdue_unfinished = [t for t in tasks if t.status not in (COMPLETED, CANCELLED)
+                          and sim.tick > t.deadline_tick]
     recovery_events = [event for task in tasks for event in task.recovery_events]
     recovered_deliveries = sum(1 for task in tasks if task.recovery_events and task.status == COMPLETED)
     recovery_approach_distance = sum(event["recovery_approach_distance"] or 0 for event in recovery_events)
@@ -41,6 +45,10 @@ def summarize(sim):
         "created": len(tasks),
         "cancelled": sum(1 for t in tasks if t.status == CANCELLED),
         "completed": len(completed),
+        "on_time": len(on_time),
+        "late": len(late),
+        "overdue_unfinished": len(overdue_unfinished),
+        "on_time_rate": len(on_time) / len(completed) if completed else None,
         "lost": len(lost),
         "in_progress": len(in_progress),
         "waiting": len(waiting),

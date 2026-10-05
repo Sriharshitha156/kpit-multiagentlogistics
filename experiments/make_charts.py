@@ -53,6 +53,10 @@ PANELS = {
                          ("avg_delivery", "Average delivery time (ticks)", ALL),
                          ("battery_failures", "Battery failures", ALL),
                          ("messages_sent", "Messages sent", ["AUCTION"])],
+    "deadline_scenarios": [("on_time_rate", "On-time share of completed orders", ALL),
+                           ("late", "Late completed orders", ALL),
+                           ("overdue_unfinished", "Overdue unfinished orders", ALL),
+                           ("completed", "Completed orders", ALL)],
     "auction_consistency": [("auction_conflict_rate", "Fraction of accepted auctions with conflicting claims", ["AUCTION"]),
                             ("conflicted_auctions", "Auctions with multiple accept claims", ["AUCTION"]),
                             ("unaccepted_auctions", "Auctions with no observed accept claim", ["AUCTION"]),
@@ -103,12 +107,17 @@ def draw(rows, experiment, out_dir):
                             color=COLOURS[strategy], alpha=1.0 if not group else 0.35 + 0.3 * groups.index(group), label=label)
         ax.set_title(title, fontsize=11)
         ax.grid(alpha=0.3)
+        if metric == "on_time_rate":
+            ax.set_ylim(0, 1.02)
+        elif metric in ("late", "overdue_unfinished", "completed"):
+            ax.set_ylim(bottom=0)
         if not numeric:
             ax.set_xticks(list(positions.values()))
             ax.set_xticklabels(list(positions.keys()),
-                               rotation=25 if experiment in ("stress_scenarios", "energy_scenarios") else 0,
-                               ha="right" if experiment in ("stress_scenarios", "energy_scenarios") else "center",
-                               fontsize=9 if experiment in ("stress_scenarios", "energy_scenarios") else 10)
+                               rotation=25 if experiment in ("stress_scenarios", "energy_scenarios", "deadline_scenarios") else 0,
+                               ha="right" if experiment in ("stress_scenarios", "energy_scenarios", "deadline_scenarios") else "center",
+                               fontsize=8 if experiment == "deadline_scenarios" else
+                               (9 if experiment in ("stress_scenarios", "energy_scenarios") else 10))
             ax.set_xlim(-0.5, len(xs) - 0.5)
         elif experiment == "fleet_size":
             ax.set_xscale("log")
@@ -122,7 +131,7 @@ def draw(rows, experiment, out_dir):
         handles, labels = axes.flat[1].get_legend_handles_labels()
     fig.legend(handles, labels, loc="lower center", ncol=3, frameon=False)
     fig.suptitle("%s  (n = %s seeds per point, error bars = 1 std)" % (experiment.replace("_", " "), first["n"]), fontsize=12)
-    bottom = 0.18 if experiment in ("stress_scenarios", "energy_scenarios") else 0.06
+    bottom = 0.22 if experiment == "deadline_scenarios" else (0.18 if experiment in ("stress_scenarios", "energy_scenarios") else 0.06)
     fig.tight_layout(rect=(0, bottom, 1, 0.96))
     os.makedirs(out_dir, exist_ok=True)
     fig.savefig(os.path.join(out_dir, experiment + ".png"), dpi=150)
@@ -136,6 +145,7 @@ def xlabel(experiment):
             "timeout_sweep": "Failure timeout (ticks)", "scale_agents": "Number of vehicles",
             "scale_tasks": "Fixed number of orders", "scale_obstacles": "Obstacle density",
             "stress_scenarios": "Predefined stress scenario",
+            "deadline_scenarios": "Predefined stress scenario",
             "auction_consistency": "Message loss probability",
             "energy_scenarios": "Battery stress scenario"}[experiment]
 

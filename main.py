@@ -41,7 +41,8 @@ PRIORITY_COLOURS = {1: (130, 150, 175), 2: (255, 190, 60), 3: (255, 120, 70)}
 PRIORITY_NAMES = {1: "low", 2: "medium", 3: "high"}
 AGENT_COLOURS = [(25, 195, 169), (255, 140, 90), (120, 160, 255), (240, 120, 200),
                  (170, 220, 90), (255, 220, 100), (180, 130, 255), (100, 220, 230)]
-FEED_COLOURS = {"TASK_REQUEST": TEXT, "TASK_BID": MUTED, "TASK_ACCEPT": TEAL, "DELIVERY_COMPLETE": GREEN,
+FEED_COLOURS = {"TASK_REQUEST": TEXT, "TASK_BID": MUTED, "TASK_ACCEPT": TEAL, "TASK_CANCEL": RED,
+                "DELIVERY_COMPLETE": GREEN,
                 "TASK_REASSIGN": YELLOW, "AGENT_FAILURE": RED, "HEARTBEAT": (90, 110, 130)}
 
 STRATEGIES = ["B1", "B2", "AUCTION"]
@@ -216,7 +217,8 @@ def tooltip_for(sim, cell):
         else:
             state = "carried by A%d" % task.owner_id
         return ["Order #%d (%s priority)" % (task.task_id, PRIORITY_NAMES[task.priority]),
-                "This is its %s." % ("pickup point" if at_pickup else "drop-off point"), state.capitalize()]
+                "This is its %s." % ("pickup point" if at_pickup else "drop-off point"), state.capitalize(),
+                "Deadline: tick %d" % task.deadline_tick]
     if cell in sim.env.chargers:
         return ["Charging station", "Vehicles recharge here."]
     if cell in sim.env.obstacles:
@@ -265,6 +267,8 @@ def draw_panel(screen, sim, fonts, ticks_per_second, paused, top):
             ("Agents", "%d alive, %d failed" % (sim.alive_count(), sim.failed_count()), TEXT),
             ("Waiting orders", str(m["waiting"]), TEXT),
             ("Completed", str(m["completed"]), GREEN),
+            ("On time / late", "%d / %d" % (m["on_time"], m["late"]), GREEN if not m["late"] else RED),
+            ("Overdue open", str(m["overdue_unfinished"]), RED if m["overdue_unfinished"] else TEXT),
             ("Avg delivery", avg, TEXT),
             ("Lost / recovered", "%d / %d" % (m["lost"], m["reassigned_tasks"]), RED if m["lost"] else TEXT),
             ("Avg reassign", reassign, TEXT),
@@ -305,6 +309,7 @@ def draw_stats(screen, sim, x, y, fonts, title):
     central = sim.dispatcher is not None
     rows = [("Agents", "%d alive, %d failed" % (sim.alive_count(), sim.failed_count()), TEXT),
             ("Completed", "%d  (waiting %d)" % (m["completed"], m["waiting"]), GREEN),
+            ("On time / late", "%d / %d" % (m["on_time"], m["late"]), GREEN if not m["late"] else RED),
             ("Avg delivery", avg, TEXT),
             ("Lost / recovered", "%d / %d" % (m["lost"], m["reassigned_tasks"]), RED if m["lost"] else TEXT),
             ("Avg reassign", reassign, TEXT),
@@ -509,6 +514,7 @@ def draw_help(screen, fonts):
                  "Left-click a vehicle: fail that vehicle", "Right-click a cell: block that road",
                  "Hover over anything: see what it is", "Split screen (S): central dispatcher vs our fleet",
                  "Dispatcher (D): switch the central dispatcher off", "Heartbeats (H): show heartbeat messages in the feed",
+                 "Cancel waiting order (C): withdraw the oldest unassigned order",
                  "Auction bids (A): inspect bids, accepted winner, and prior auctions",
                  "New map (R), Strategy (TAB), Help (?), Quit (ESC)"]:
         draw_text(screen, font, text, 600, y, TEXT)
@@ -571,6 +577,11 @@ class App:
     def views(self):
         return list(split_views()) if self.split else [single_view()]
 
+    def cancellable_task_ids(self):
+        """Tasks still open in every displayed world, so split comparisons stay paired."""
+        open_ids = [{task.task_id for task in sim.env.tasks if task.status == OPEN} for sim in self.sims]
+        return set.intersection(*open_ids) if open_ids else set()
+
     def say(self, text, seconds=2.5):
         self.banner, self.banner_until = text, pygame.time.get_ticks() + int(seconds * 1000)
 
@@ -594,8 +605,10 @@ class App:
                  {"action": "strategy", "label": "Strategy: " + STRATEGY_SHORT[strategy], "enabled": True},
                  {"action": "split", "label": "Split screen", "enabled": True, "active": self.split}],
                 [{"action": "dispatcher", "label": dispatcher_label, "enabled": dispatcher_enabled},
-                 {"action": "heartbeats", "label": "Heartbeats: " + ("on" if self.show_heartbeats else "off"),
-                  "enabled": True}]]
+                 {"action": "heartbeats", "label": "HB " + ("on" if self.show_heartbeats else "off"),
+                  "enabled": True},
+                 {"action": "cancel", "label": "Cancel (C)",
+                  "enabled": bool(self.cancellable_task_ids())}]]
 
     def button_rects(self):
         return layout_buttons(self.button_groups(), self.button_font, self.screen.get_width())
@@ -609,6 +622,16 @@ class App:
             if self.auction_open:
                 sim = self._auction_sim()
                 self.auction_index = max(0, len(sim.bus.auction_history) - 1) if sim and sim.bus else 0
+        elif name == "cancel":
+            task_ids = self.cancellable_task_ids()
+            if not task_ids:
+                self.say("No waiting order to cancel")
+            else:
+                task_id = min(task_ids, key=lambda candidate_id: (
+                    self.sims[0].env.task_by_id[candidate_id].created_tick, candidate_id))
+                cancelled = sum(sim.cancel_task(task_id) for sim in self.sims)
+                self.say("Cancelled waiting order #%d (%d view%s)" %
+                         (task_id, cancelled, "" if cancelled == 1 else "s"))
         elif name == "recovery_demo":
             self.sims = self._new_sims()
             self.auction_open = False
@@ -654,6 +677,7 @@ class App:
     KEYS = {pygame.K_SPACE: "pause", pygame.K_UP: "faster", pygame.K_DOWN: "slower", pygame.K_1: "rush",
             pygame.K_2: "storm", pygame.K_3: "block", pygame.K_4: "recovery_demo", pygame.K_r: "new_map", pygame.K_TAB: "strategy",
             pygame.K_s: "split", pygame.K_d: "dispatcher", pygame.K_h: "heartbeats", pygame.K_a: "auction", pygame.K_F1: "help",
+            pygame.K_c: "cancel",
             pygame.K_QUESTION: "help", pygame.K_SLASH: "help"}
 
     def _auction_sim(self):
