@@ -58,6 +58,27 @@ class TestRunner(unittest.TestCase):
         row = runner.run_job(job, 30)
         self.assertGreater(row["compute_seconds"], 0)
 
+    def test_emergency_priority_changes_only_priority_not_scheduled_locations(self):
+        regular = runner.build_task_schedule(44, 80, 0.0, task_count=20, task_priority=1)
+        emergency = runner.build_task_schedule(44, 80, 0.0, task_count=20, task_priority=3)
+        self.assertEqual([(t, p, d) for t, p, d, _ in regular],
+                         [(t, p, d) for t, p, d, _ in emergency])
+        self.assertEqual({priority for _, _, _, priority in emergency}, {3})
+
+    def test_initial_battery_stress_sets_every_vehicle(self):
+        sim = Simulation(seed=4, num_agents=6, strategy="B2", initial_battery=35)
+        self.assertEqual([agent.battery for agent in sim.agents], [35.0] * 6)
+
+    def test_stress_suite_covers_all_seven_scenarios(self):
+        jobs = runner.make_jobs(runner.stress_experiments(), [1])
+        labels = {job["x"] for job in jobs}
+        self.assertEqual(labels, {"Normal", "High demand", "Multiple failures", "Blocked roads",
+                                  "Low battery", "Emergency orders", "Large fleet"})
+        by_label = {job["x"]: job for job in jobs}
+        self.assertEqual(by_label["Emergency orders"]["task_priority"], 3)
+        self.assertEqual(by_label["Low battery"]["initial_battery"], 35)
+        self.assertEqual(by_label["Large fleet"]["num_agents"], 100)
+
     def test_aggregate_computes_mean_and_std(self):
         rows = [{"experiment": "e", "group": "", "x": "1", "strategy": "B2", "seed": s,
                  **{m: "" for m in runner.METRICS}} for s in (1, 2, 3)]

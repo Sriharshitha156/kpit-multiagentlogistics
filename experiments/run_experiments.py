@@ -49,9 +49,11 @@ def exp(name, x_name, xs, build, strategies=STRATEGIES, groups=("",)):
     return {"name": name, "x_name": x_name, "xs": xs, "build": build, "strategies": strategies, "groups": groups}
 
 
-def scenario(num_agents=8, overrides=None, failures=0, outage=False, task_count=None):
+def scenario(num_agents=8, overrides=None, failures=0, outage=False, task_count=None,
+            task_priority=None, initial_battery=None):
     return {"num_agents": num_agents, "overrides": overrides or {}, "failures": failures,
-            "outage": outage, "task_count": task_count}
+            "outage": outage, "task_count": task_count, "task_priority": task_priority,
+            "initial_battery": initial_battery}
 
 
 def main_experiments():
@@ -94,6 +96,22 @@ def scale_experiments():
     ]
 
 
+def stress_experiments():
+    """Seven matched, measurable stress cases from normal use through a large fleet."""
+    cases = {
+        "Normal": lambda: scenario(num_agents=8, task_count=50),
+        "High demand": lambda: scenario(num_agents=8, task_count=100),
+        "Multiple failures": lambda: scenario(num_agents=8, failures=4, task_count=50),
+        "Blocked roads": lambda: scenario(num_agents=8, task_count=50,
+                                           overrides={"OBSTACLE_DENSITY": 0.30}),
+        "Low battery": lambda: scenario(num_agents=8, task_count=50, initial_battery=35),
+        "Emergency orders": lambda: scenario(num_agents=8, task_count=50, task_priority=3),
+        "Large fleet": lambda: scenario(num_agents=100, failures=10, task_count=100),
+    }
+    return [exp("stress_scenarios", "scenario", list(cases),
+                lambda label, group: cases[label]())]
+
+
 SUITES = {"main": (main_experiments, MAIN_SEEDS, 1500),
           "sweep": (sweep_experiments, SWEEP_SEEDS, 1500),
           "quick": (quick_experiments, QUICK_SEEDS, 500),
@@ -103,7 +121,8 @@ SUITES = {"main": (main_experiments, MAIN_SEEDS, 1500),
           "paired-quick": (quick_experiments, QUICK_SEEDS, 500),
           "paired-scale": (scale_experiments, SCALE_SEEDS, 600),
           # Fresh folder for a clean, reviewable result set, separate from prior runs.
-          "paired-scale-clean": (scale_experiments, SCALE_SEEDS, 600)}
+          "paired-scale-clean": (scale_experiments, SCALE_SEEDS, 600),
+          "paired-stress": (stress_experiments, SCALE_SEEDS, 600)}
 
 
 def make_jobs(experiments, seeds):
@@ -125,7 +144,7 @@ def failing_agents(seed, num_agents, count):
     return random.Random(seed * 100 + count).sample(range(1, num_agents + 1), count)
 
 
-def build_task_schedule(seed, ticks, spawn_probability, task_count=None):
+def build_task_schedule(seed, ticks, spawn_probability, task_count=None, task_priority=None):
     """Create exogenous task arrivals once so paired strategies get identical demand."""
     from environment import Environment
 
@@ -141,7 +160,8 @@ def build_task_schedule(seed, ticks, spawn_probability, task_count=None):
         count = counts_by_tick.get(tick, 0) if task_count is not None else int(arrivals.random() < spawn_probability)
         for _ in range(count):
             task = template.spawn_task(tick)
-            schedule.append((tick, task.pickup, task.destination, task.priority))
+            priority = task_priority if task_priority is not None else task.priority
+            schedule.append((tick, task.pickup, task.destination, priority))
     return schedule
 
 
@@ -153,11 +173,11 @@ def run_job(job, ticks):
     try:
         paired = job.get("paired_tasks", False)
         task_schedule = (build_task_schedule(job["seed"], ticks, config.TASK_SPAWN_PROBABILITY,
-                                             job.get("task_count"))
+                                             job.get("task_count"), job.get("task_priority"))
                          if paired else None)
         compute_started = time.perf_counter()
         sim = Simulation(seed=job["seed"], num_agents=job["num_agents"], strategy=job["strategy"],
-                         task_schedule=task_schedule)
+                         task_schedule=task_schedule, initial_battery=job.get("initial_battery"))
         doomed = failing_agents(job["seed"], job["num_agents"], job["failures"])
         for t in range(ticks):
             if t == FAIL_TICK:

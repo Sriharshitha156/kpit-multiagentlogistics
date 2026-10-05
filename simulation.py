@@ -18,7 +18,7 @@ class Simulation:
     """Holds the environment, agents and (for baselines) the dispatcher."""
 
     def __init__(self, seed=config.RANDOM_SEED, num_agents=config.NUM_AGENTS, strategy=None,
-                 task_schedule=None):
+                 task_schedule=None, initial_battery=None):
         self.strategy = strategy or config.STRATEGY
         self.env = Environment(seed)
         # A schedule is used by paired experiments; normal interactive runs keep
@@ -34,6 +34,11 @@ class Simulation:
             self.agents.append(Agent(agent_id=i + 1, start_position=start, bus=self.bus,
                                      known_obstacles=self.env.obstacles,
                                      peer_ids=[j + 1 for j in range(num_agents) if j != i]))
+        if initial_battery is not None:
+            if not 0 <= initial_battery <= config.BATTERY_MAX:
+                raise ValueError("initial_battery must be between 0 and BATTERY_MAX")
+            for agent in self.agents:
+                agent.battery = float(initial_battery)
         self.dispatcher = None
         if self.strategy == "B1":
             self.dispatcher = CentralDispatcherB1()

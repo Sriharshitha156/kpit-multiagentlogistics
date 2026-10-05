@@ -49,6 +49,10 @@ PANELS = {
                         ("compute_seconds", "Simulation time per run (seconds)", ALL),
                         ("total_distance", "Total distance (cells)", ALL),
                         ("battery_failures", "Vehicles that ran out of battery", ALL)],
+    "stress_scenarios": [("completion_rate", "Completion rate", ALL),
+                         ("avg_delivery", "Average delivery time (ticks)", ALL),
+                         ("battery_failures", "Battery failures", ALL),
+                         ("messages_sent", "Messages sent", ["AUCTION"])],
 }
 
 
@@ -93,7 +97,10 @@ def draw(rows, experiment, out_dir):
         ax.grid(alpha=0.3)
         if not numeric:
             ax.set_xticks(list(positions.values()))
-            ax.set_xticklabels(list(positions.keys()))
+            ax.set_xticklabels(list(positions.keys()),
+                               rotation=25 if experiment == "stress_scenarios" else 0,
+                               ha="right" if experiment == "stress_scenarios" else "center",
+                               fontsize=9 if experiment == "stress_scenarios" else 10)
             ax.set_xlim(-0.5, len(xs) - 0.5)
         elif experiment == "fleet_size":
             ax.set_xscale("log")
@@ -107,7 +114,8 @@ def draw(rows, experiment, out_dir):
         handles, labels = axes.flat[1].get_legend_handles_labels()
     fig.legend(handles, labels, loc="lower center", ncol=3, frameon=False)
     fig.suptitle("%s  (n = %s seeds per point, error bars = 1 std)" % (experiment.replace("_", " "), first["n"]), fontsize=12)
-    fig.tight_layout(rect=(0, 0.06, 1, 0.96))
+    bottom = 0.18 if experiment == "stress_scenarios" else 0.06
+    fig.tight_layout(rect=(0, bottom, 1, 0.96))
     os.makedirs(out_dir, exist_ok=True)
     fig.savefig(os.path.join(out_dir, experiment + ".png"), dpi=150)
     plt.close(fig)
@@ -118,7 +126,8 @@ def xlabel(experiment):
             "obstacles": "Obstacle density", "failures": "Vehicles failed at tick 300",
             "dispatcher_outage": "Dispatcher outage at tick 300", "message_loss": "Message loss probability",
             "timeout_sweep": "Failure timeout (ticks)", "scale_agents": "Number of vehicles",
-            "scale_tasks": "Fixed number of orders", "scale_obstacles": "Obstacle density"}[experiment]
+            "scale_tasks": "Fixed number of orders", "scale_obstacles": "Obstacle density",
+            "stress_scenarios": "Predefined stress scenario"}[experiment]
 
 
 def main():

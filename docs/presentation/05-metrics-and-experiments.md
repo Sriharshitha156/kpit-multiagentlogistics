@@ -69,6 +69,21 @@ Charts from one completed 99-run batch (three seeds per point):
 - [Order-count comparison](figures/paired-scale-tasks.png)
 - [Obstacle-density comparison](figures/paired-scale-obstacles.png)
 
+### Stress-scenario run
+
+Run the seven predefined cases and chart their measured results:
+
+```powershell
+python experiments/run_experiments.py --suite paired-stress
+python experiments/make_charts.py --suite paired-stress
+```
+
+This suite uses three seeds and 600 ticks per run, with B1, B2, and AUCTION receiving the same scheduled orders within each case. The seven cases are normal demand (8 vehicles, 50 orders), high demand (8, 100), four failures (8, 50), dense blocked-road map (30% obstacle target, 8, 50), low starting battery (35 out of 100 units, 8, 50), emergency-priority orders (priority 3, 8, 50), and a large fleet (100, 100, 10 failures). Failure events occur at tick 300. The output is a comparison of simulator scenarios under stated assumptions, not a real-city forecast.
+
+One completed batch contains 63 runs (3 strategies × 7 scenarios × 3 seeds):
+
+![Measured stress-scenario comparison](figures/paired-stress-scenarios.png)
+
 ### What “paired requests” means
 
 For one seed and scenario, the runner creates a list of orders in advance: when each order arrives, its pickup, destination, and priority. B1, B2, and AUCTION then receive that same list. In everyday terms, this is like comparing three delivery teams on the same day's orders, instead of giving each team a different day's work. This makes the strategy comparison easier to interpret; vehicles can still take different routes and finish different numbers of orders.
