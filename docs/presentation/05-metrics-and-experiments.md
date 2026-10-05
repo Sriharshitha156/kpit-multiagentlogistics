@@ -62,6 +62,13 @@ python experiments/make_charts.py --suite paired-scale-clean
 
 This suite uses three seeds and 600 ticks per run. It checks 5, 10, 25, 50, and 100 agents with 50 scheduled orders; 25, 50, and 100 scheduled orders with 25 agents; and obstacle densities of 0%, 10%, and 20% with 25 agents. Each case has a seeded failure load (about 10% of the fleet for the agent-count experiment; two agents in the other cases). The `paired-scale-clean` suite writes to a fresh results folder. The reported `compute_seconds` is wall-clock time for simulator setup, execution, and metric calculation on the machine running it. Treat that timing as machine dependent, and do not describe the three-seed run as proof of real-world scalability.
 
+Charts from one completed 99-run batch (three seeds per point):
+
+![Scalability results by fleet size](figures/paired-scale-agents.png)
+
+- [Order-count comparison](figures/paired-scale-tasks.png)
+- [Obstacle-density comparison](figures/paired-scale-obstacles.png)
+
 ### What “paired requests” means
 
 For one seed and scenario, the runner creates a list of orders in advance: when each order arrives, its pickup, destination, and priority. B1, B2, and AUCTION then receive that same list. In everyday terms, this is like comparing three delivery teams on the same day's orders, instead of giving each team a different day's work. This makes the strategy comparison easier to interpret; vehicles can still take different routes and finish different numbers of orders.
