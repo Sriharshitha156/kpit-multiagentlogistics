@@ -31,9 +31,13 @@ Press `1` for a rush of orders. Point to the message feed for requests, bids, an
 
 Point out a battery bar and route line. Explain that battery is used to reject infeasible bids and agents travel to a charger when idle and low on charge. Press `3` to block roads; the system avoids protected cells and the map generator keeps the free map connected.
 
-### 4. Demonstrate failure recovery
+### 4. Demonstrate deterministic failure recovery
 
-Click a moving vehicle to fail it. Its peers wait until heartbeat timeout, suspect the silent vehicle, and start a new auction for unfinished work. The message feed and red orphaned task make the sequence visible. Recovery is not instantaneous; the current timeout is 15 silent ticks plus message/tick timing.
+Close the welcome/help overlay if it is open, then press `4`. The simulator resets to a clean run, places a high-priority delivery at Agent 1's location, lets the normal allocation strategy choose the carrier, and fails that vehicle after pickup. In split view, both strategies receive a matching task setup; central B2 may recover immediately while the auction fleet waits for heartbeat-based detection. Watch the message feed, then inspect the task's auction history with `A`.
+
+The `Rescue` value shows replacement-to-parcel route distance and how many recovered tasks eventually completed. The route distance is the replacement's approach distance, not a measured increase over a no-failure counterfactual.
+
+For a less scripted failure, click a vehicle with an active route. Its peers wait for the heartbeat timeout, suspect the silent vehicle, and start a new auction for unfinished work. The exact replacement can vary.
 
 ### 5. Compare strategies
 
@@ -48,6 +52,7 @@ Press `S` for split view. Explain B1 as nearest idle without a battery feasibili
 | `1` | Add a rush-hour burst |
 | `2` | Fail several vehicles, leaving one alive |
 | `3` | Block several roads |
+| `4` | Reset and run the deterministic fail-while-carrying recovery demo |
 | `A` | Open auction details; arrows browse history |
 | `S` | Toggle split-screen comparison |
 | `TAB` | Switch allocation strategy (or B1/B2 in split view) |

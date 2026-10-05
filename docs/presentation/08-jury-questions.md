@@ -18,7 +18,11 @@ Priority changes the weight on time until pickup in the bid formula; task queues
 
 ## What happens when an agent fails?
 
-Peers infer failure after a heartbeat timeout, inspect their own ledgers, and re-auction unfinished tasks. A carried parcel is approximated at the last reported vehicle position. This is delayed, simulated recovery, not an instantaneous physical rescue.
+Peers infer failure after a heartbeat timeout, inspect their own ledgers, and re-auction unfinished tasks. The deterministic demo uses key 4 to fail a carrier after pickup. A carried parcel is approximated at the last reported vehicle position. This is delayed, simulated recovery, not an instantaneous physical rescue.
+
+## What recovery data do we record?
+
+For each reassigning event, we record the failed/replacement agent IDs, failure and reassignment ticks, elapsed recovery time, the replacement's route distance to the parcel, and eventual delivery outcome. The route distance is not an estimate of extra distance compared with a counterfactual run.
 
 ## What happens with 100 agents?
 

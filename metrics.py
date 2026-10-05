@@ -14,6 +14,9 @@ def summarize(sim):
     failed_ids = {a.agent_id for a in sim.agents if a.status == FAILED}
 
     completed = [t for t in tasks if t.status == COMPLETED]
+    recovery_events = [event for task in tasks for event in task.recovery_events]
+    recovered_deliveries = sum(1 for task in tasks if task.recovery_events and task.status == COMPLETED)
+    recovery_approach_distance = sum(event["recovery_approach_distance"] or 0 for event in recovery_events)
     # A task is "lost" if its owner failed and nobody took it over (recovery comes in Phase 9).
     lost = [t for t in tasks if t.status in (ASSIGNED, PICKED_UP) and t.owner_id in failed_ids]
     in_progress = [t for t in tasks if t.status in (ASSIGNED, PICKED_UP) and t.owner_id not in failed_ids]
@@ -42,6 +45,9 @@ def summarize(sim):
         "battery_failures": sum(1 for a in sim.agents if a.fail_reason == "BATTERY"),
         "utilization": (busy_ticks / alive_ticks) if alive_ticks else 0.0,
         "reassigned_tasks": sum(1 for t in tasks if t.reassign_count > 0),
+        "recovery_events": len(recovery_events),
+        "recovered_deliveries": recovered_deliveries,
+        "recovery_approach_distance": recovery_approach_distance,
         "avg_reassignment_time": (sum(env.reassignment_times) / len(env.reassignment_times)) if env.reassignment_times else None,
         "avg_detection_latency": (sum(env.detection_ticks[a] - env.failure_ticks[a] for a in env.detection_ticks) / len(env.detection_ticks)) if env.detection_ticks else None,
         "false_suspicions": env.false_suspicions,

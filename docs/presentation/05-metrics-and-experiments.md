@@ -14,6 +14,9 @@
 | Battery failures | Failed agents whose failure reason is `BATTERY` | Agents |
 | Utilization | Sum of busy ticks divided by sum of alive ticks | Ratio; busy means pickup travel or delivery, not charging/idle |
 | Reassigned tasks | Number of tasks with at least one recorded recovery reassignment | Unique tasks, not total reassignment events |
+| Recovery events | Number of failed-owner-to-replacement assignments recorded | Events |
+| Recovered deliveries | Reassigned tasks that eventually reached `COMPLETED` | Unique tasks |
+| Recovery approach distance | Sum of each replacement agent's planned route from its position at reassignment to the parcel pickup point | Grid cells; not excess distance versus a no-failure counterfactual |
 | Average reassignment time | Mean of failure tick to new-owner assignment tick for recorded recoveries | Simulation ticks |
 | Average detection latency | First recorded peer-detection tick minus true failure tick | Simulation ticks; first detection only per failed agent |
 | False suspicions | Count of false peer-failure declarations recorded by agents | Declarations, not a probability/rate |
@@ -21,7 +24,7 @@
 | Messages delivered | Recipient copies delivered by the bus | Broadcast counts once per recipient; lost messages excluded |
 | Messages per completed task | Sent transmissions divided by completed deliveries | Undefined when nothing completed |
 
-On-time/late percentage, deadlines, battery consumption, computation time, and distance added specifically due to recovery are **not** currently reported.
+On-time/late percentage, deadlines, battery consumption, computation time, and recovery distance above a no-failure counterfactual are **not** currently reported.
 
 ## Baselines
 

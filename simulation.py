@@ -40,12 +40,12 @@ class Simulation:
         if self.bus is not None:
             self.bus.set_alive([a.agent_id for a in self.agents if a.is_alive()])
 
-    def new_task(self):
+    def new_task(self, pickup=None, destination=None, priority=None):
         """
         An order arrives. The order desk only ANNOUNCES it to everyone (auction mode).
         It never decides who takes it.
         """
-        task = self.env.spawn_task(self.tick)
+        task = self.env.spawn_task(self.tick, pickup=pickup, destination=destination, priority=priority)
         if self.bus is not None:
             self.bus.send(TASK_REQUEST, DESK, BROADCAST, self.tick, {"task": task.describe(), "epoch": 1})
         return task
@@ -109,7 +109,9 @@ class Simulation:
         """Record the true failure time of each agent (ground truth for the metrics only)."""
         for agent in self.agents:
             if agent.status == "FAILED" and agent.agent_id not in self.env.failure_ticks:
-                self.env.failure_ticks[agent.agent_id] = agent.failed_tick if agent.failed_tick is not None else self.tick
+                failure_tick = agent.failed_tick if agent.failed_tick is not None else self.tick
+                self.env.failure_ticks[agent.agent_id] = failure_tick
+                self.env.record_agent_failure(agent.agent_id, failure_tick)
 
     def fail_agent(self, agent_id, reason="CLICKED"):
         """Kill an agent (used by the click-to-fail demo)."""

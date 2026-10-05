@@ -7,6 +7,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
+import scenarios
 from environment import manhattan
 from metrics import summarize
 from simulation import Simulation
@@ -111,6 +112,29 @@ class TestFailureRecovery(unittest.TestCase):
         for _ in range(400):
             sim.step()
         self.assertNotEqual(task.status, COMPLETED)
+
+    def test_deterministic_recovery_demo_records_event_and_outcome(self):
+        sims = [Simulation(seed=42, strategy="B2"), Simulation(seed=42, strategy="AUCTION")]
+        message = scenarios.failure_recovery_demo(sims)
+        self.assertIn("failed carrying task #1", message)
+        for sim in sims:
+            task = sim.env.tasks[0]
+            self.assertEqual(task.status, "PICKED_UP")
+            self.assertIsNotNone(task.orphaned_tick)
+            for _ in range(100):
+                sim.step()
+            self.assertEqual(task.status, COMPLETED)
+            self.assertEqual(len(task.recovery_events), 1)
+            event = task.recovery_events[0]
+            self.assertEqual(event["failed_agent_id"], 1)
+            self.assertNotEqual(event["replacement_agent_id"], 1)
+            self.assertGreaterEqual(event["recovery_time"], 0)
+            self.assertGreaterEqual(event["recovery_approach_distance"], 0)
+            self.assertTrue(event["delivered"])
+            metrics = summarize(sim)
+            self.assertEqual(metrics["recovery_events"], 1)
+            self.assertEqual(metrics["recovered_deliveries"], 1)
+            self.assertEqual(metrics["recovery_approach_distance"], event["recovery_approach_distance"])
 
     def test_no_false_alarms_on_a_healthy_network(self):
         config.TASK_SPAWN_PROBABILITY = 0.08

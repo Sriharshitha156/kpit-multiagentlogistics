@@ -268,6 +268,7 @@ def draw_panel(screen, sim, fonts, ticks_per_second, paused, top):
             ("Avg delivery", avg, TEXT),
             ("Lost / recovered", "%d / %d" % (m["lost"], m["reassigned_tasks"]), RED if m["lost"] else TEXT),
             ("Avg reassign", reassign, TEXT),
+            ("Rescue", "%d cells / %d done" % (m["recovery_approach_distance"], m["recovered_deliveries"]), TEXT),
             ("Dist / util", "%d cells, %.0f%%" % (m["total_distance"], 100 * m["utilization"]), TEXT),
             ("Messages", messages, TEXT),
             ("Dispatcher", dispatcher, dispatcher_colour)]
@@ -307,13 +308,14 @@ def draw_stats(screen, sim, x, y, fonts, title):
             ("Avg delivery", avg, TEXT),
             ("Lost / recovered", "%d / %d" % (m["lost"], m["reassigned_tasks"]), RED if m["lost"] else TEXT),
             ("Avg reassign", reassign, TEXT),
+            ("Rescue", "%d cells / %d done" % (m["recovery_approach_distance"], m["recovered_deliveries"]), TEXT),
             ("Dispatcher" if central else "Messages", dispatcher if central else messages,
              dispatcher_colour if central else TEXT)]
     y += 18
     for name, value, colour in rows:
         draw_text(screen, small_font, name, x, y, MUTED)
         draw_text(screen, small_font, value, x + 130, y, colour)
-        y += 16
+        y += 14
 
 
 def draw_feed(screen, sim, x, y, w, h, fonts, show_heartbeats):
@@ -503,6 +505,7 @@ def draw_help(screen, fonts):
     y = 152
     for text in ["Pause / Slower / Faster:  SPACE, DOWN, UP", "Rush hour (1): 12 new orders arrive at once",
                  "Fail 3 (2): three vehicles break down together", "Block roads (3): 12 roads become blocked",
+                 "Recovery demo (4): deterministic failure while carrying a task",
                  "Left-click a vehicle: fail that vehicle", "Right-click a cell: block that road",
                  "Hover over anything: see what it is", "Split screen (S): central dispatcher vs our fleet",
                  "Dispatcher (D): switch the central dispatcher off", "Heartbeats (H): show heartbeat messages in the feed",
@@ -599,6 +602,10 @@ class App:
             if self.auction_open:
                 sim = self._auction_sim()
                 self.auction_index = max(0, len(sim.bus.auction_history) - 1) if sim and sim.bus else 0
+        elif name == "recovery_demo":
+            self.sims = self._new_sims()
+            self.auction_open = False
+            self.say(scenarios.failure_recovery_demo(self.sims), seconds=4)
         elif name == "pause":
             self.paused = not self.paused
         elif name == "faster":
@@ -638,7 +645,7 @@ class App:
             self.running = False
 
     KEYS = {pygame.K_SPACE: "pause", pygame.K_UP: "faster", pygame.K_DOWN: "slower", pygame.K_1: "rush",
-            pygame.K_2: "storm", pygame.K_3: "block", pygame.K_r: "new_map", pygame.K_TAB: "strategy",
+            pygame.K_2: "storm", pygame.K_3: "block", pygame.K_4: "recovery_demo", pygame.K_r: "new_map", pygame.K_TAB: "strategy",
             pygame.K_s: "split", pygame.K_d: "dispatcher", pygame.K_h: "heartbeats", pygame.K_a: "auction", pygame.K_F1: "help",
             pygame.K_QUESTION: "help", pygame.K_SLASH: "help"}
 

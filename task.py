@@ -46,6 +46,9 @@ class Task:
         self.reassign_count = 0
         self.picked_up_tick = None
         self.completed_tick = None
+        self.orphaned_by = None
+        self.orphaned_tick = None
+        self.recovery_events = []      # failure, reassignment, rescue approach distance, and outcome
 
     def describe(self):
         """Make the plain copy that can be sent to agents."""

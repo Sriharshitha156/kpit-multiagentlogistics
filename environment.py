@@ -117,13 +117,18 @@ class Environment:
         return min(self.chargers, key=lambda c: abs(c[0] - cell[0]) + abs(c[1] - cell[1]))
 
     # ----- delivery requests -----
-    def spawn_task(self, current_tick):
-        """Create a new delivery task with a random pickup, destination and priority."""
-        pickup = self.random_free_cell(avoid_chargers=True)
-        destination = self.random_free_cell(avoid_chargers=True)
-        while destination == pickup:
+    def spawn_task(self, current_tick, pickup=None, destination=None, priority=None):
+        """Create a task, optionally with explicit endpoints for deterministic demos."""
+        pickup = pickup if pickup is not None else self.random_free_cell(avoid_chargers=True)
+        if destination is None:
             destination = self.random_free_cell(avoid_chargers=True)
-        priority = self.rng.choice([1, 2, 3])
+            while destination == pickup:
+                destination = self.random_free_cell(avoid_chargers=True)
+        if not self.is_free(pickup) or not self.is_free(destination) or destination == pickup:
+            raise ValueError("task endpoints must be distinct free cells")
+        priority = self.rng.choice([1, 2, 3]) if priority is None else priority
+        if priority not in (1, 2, 3):
+            raise ValueError("priority must be 1, 2, or 3")
         task = Task(self.next_task_id, pickup, destination, priority, current_tick)
         self.next_task_id += 1
         self.add_task(task)
@@ -137,16 +142,34 @@ class Environment:
     # ----- "world events": agents call these when they physically act -----
     # These only update the ground truth used by the metrics and the drawing.
     # Agents NEVER read this information back. They learn about each other through messages.
-    def record_assignment(self, task_id, agent_id, tick):
+    def record_assignment(self, task_id, agent_id, tick, recovery_approach_distance=None):
         task = self.task_by_id[task_id]
         if task.status == "COMPLETED":
             return
         previous = task.owner_id
         if previous is not None and previous != agent_id and previous in self.failure_ticks:
             task.reassign_count += 1                                  # a task was recovered
-            self.reassignment_times.append(tick - self.failure_ticks[previous])
+            recovery_time = tick - self.failure_ticks[previous]
+            self.reassignment_times.append(recovery_time)
+            task.recovery_events.append({
+                "failed_agent_id": previous,
+                "failure_tick": self.failure_ticks[previous],
+                "replacement_agent_id": agent_id,
+                "reassignment_tick": tick,
+                "recovery_time": recovery_time,
+                "recovery_approach_distance": recovery_approach_distance,
+                "delivered": False,
+                "delivery_tick": None,
+            })
         task.status = "ASSIGNED"
         task.owner_id = agent_id
+
+    def record_agent_failure(self, agent_id, tick):
+        """Mark unfinished work owned by a newly failed agent as orphaned."""
+        for task in self.tasks:
+            if task.owner_id == agent_id and task.status in ("ASSIGNED", "PICKED_UP"):
+                task.orphaned_by = agent_id
+                task.orphaned_tick = tick
 
     def record_detection(self, failed_id, tick):
         """A peer declared `failed_id` dead. Count the first real detection, and any false alarm."""
@@ -166,6 +189,9 @@ class Environment:
             return
         task.status = "COMPLETED"
         task.completed_tick = tick
+        for recovery in task.recovery_events:
+            recovery["delivered"] = True
+            recovery["delivery_tick"] = tick
 
     def open_task_count(self):
         """How many tasks are still waiting for an owner."""

@@ -62,6 +62,13 @@ class TestWindow(unittest.TestCase):
         self.app.handle_event(key(pygame.K_ESCAPE))
         self.assertFalse(self.app.auction_open)
 
+    def test_recovery_demo_key_starts_with_a_failed_carrier(self):
+        self.app.handle_event(key(pygame.K_4, "4"))
+        task = self.app.sims[0].env.tasks[0]
+        self.assertEqual(task.status, "PICKED_UP")
+        self.assertFalse(self.app.sims[0].agents[task.owner_id - 1].is_alive())
+        self.assertIn("Recovery demo", self.app.banner)
+
     def test_rush_hour_button_creates_orders(self):
         before = len(self.app.sims[0].env.tasks)
         self.app.handle_event(click(self.button_centre("rush")))

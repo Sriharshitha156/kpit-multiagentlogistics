@@ -44,7 +44,9 @@ class CentralDispatcherB1:
                 return 10 ** 9 if d is None else d
             best = min(idle_agents, key=lambda a: (distance(a), a.agent_id))
             best.enqueue_task(task.describe())
-            env.record_assignment(task.task_id, best.agent_id, tick)
+            rescue_distance = best.path_length(best.position, task.pickup, env)
+            env.record_assignment(task.task_id, best.agent_id, tick,
+                                  recovery_approach_distance=rescue_distance)
 
 
 class CentralDispatcherB2:
@@ -77,4 +79,6 @@ class CentralDispatcherB2:
             if bids:
                 cost, agent_id, best = min(bids, key=lambda b: (b[0], b[1]))
                 best.enqueue_task(info)
-                env.record_assignment(task.task_id, agent_id, tick)
+                rescue_distance = best.path_length(best.position, info.pickup, env)
+                env.record_assignment(task.task_id, agent_id, tick,
+                                      recovery_approach_distance=rescue_distance)

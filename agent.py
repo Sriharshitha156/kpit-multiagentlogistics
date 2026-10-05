@@ -302,7 +302,9 @@ class Agent:
             self.enqueue_task(entry["task"])
             self.bus.send(TASK_ACCEPT, self.agent_id, BROADCAST, tick,
                           {"task_id": entry["task"].task_id, "epoch": entry["epoch"], "cost": winner_cost})
-            env.record_assignment(entry["task"].task_id, self.agent_id, tick)   # metrics only
+            rescue_distance = self.path_length(self.position, entry["task"].pickup, env)
+            env.record_assignment(entry["task"].task_id, self.agent_id, tick,
+                                  recovery_approach_distance=rescue_distance)   # metrics only
         else:
             entry["status"] = PROVISIONAL
             entry["confirm_by"] = tick + config.ACCEPT_GRACE

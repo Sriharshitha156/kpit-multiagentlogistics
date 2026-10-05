@@ -20,6 +20,8 @@ Can a fleet of autonomous EV agents allocate delivery work and recover from vehi
 
 The demonstrable contribution is an understandable simulation of local bidding, peer failure detection, and task recovery, with central baselines and repeatable experiment scripts. Do not claim that auctions are always better; that conclusion must come from current, correctly paired experiment results.
 
+For a repeatable live recovery sequence, press `4` to reset to a clean run, let the fleet auction a high-priority task, and fail its carrier after pickup. The demo then shows delayed peer detection, recovery bidding, reassignment, and delivery tracking.
+
 ## Everyday analogy
 
 Think of delivery orders arriving in a neighbourhood. Each van checks, “Can I reach the pickup, deliver the parcel, and still get to a charger? How much work do I already have?” Vans that pass the feasibility checks bid. The lowest-cost bid wins. If that van later goes silent, the other vans can compete to take its task.

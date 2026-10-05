@@ -17,10 +17,12 @@ The simulation uses the failed carrier's last heartbeat position as the approxim
 
 ## How to demonstrate
 
-Create a rush-hour burst with `1`, then click a vehicle with an active route. Watch for the failure, heartbeat timeout, `AGENT_FAILURE` / `TASK_REASSIGN` messages, new bids, and acceptance. The replacement may not be the same agent on every run.
+Close the welcome/help overlay if it is open, then press 4 for a deterministic setup: it resets to a clean simulation, creates a battery-feasible high-priority task at Agent 1's current cell, lets the strategy allocate it, advances until pickup, and fails the carrier. Then watch the message feed as peers detect the failure and re-auction the task. Recovery is not instantaneous; the current timeout is 15 silent ticks plus heartbeat/message timing.
+
+For a less scripted run, create a rush-hour burst with 1, then click a vehicle with an active route. The owner fails immediately, and peers recover any unfinished work after their timeout.
 
 In split-screen mode, B2 recovers with immediate central knowledge. That is intentionally faster and has an information advantage over the auction mode; it should not be described as an equal-information comparison.
 
 ## Recovery metrics
 
-The simulation records failure time, first detection time, reassignment time, task reassignment count, and eventual task completion through task status. It does not currently record extra recovery-only distance or a separate recovery-success rate. The “lost” display is a current failed-owner snapshot; a task can disappear from it after successful reassignment.
+Each recovery event records the failed agent and failure tick, replacement agent, reassignment tick, recovery time, replacement route distance to the parcel, and whether the task eventually completed. The displayed recovery approach distance is not the distance increase over a counterfactual no-failure run.
