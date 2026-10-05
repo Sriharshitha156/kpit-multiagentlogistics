@@ -335,6 +335,74 @@ def draw_feed(screen, sim, x, y, w, h, fonts, show_heartbeats):
         ly += 15
 
 
+def draw_auction_overlay(screen, sim, record, record_index, record_count, fonts):
+    """Show a read-only explanation of one auction reconstructed from bus sends."""
+    width, height = screen.get_size()
+    overlay = pygame.Surface((width, height), pygame.SRCALPHA)
+    overlay.fill((5, 12, 22, 225))
+    screen.blit(overlay, (0, 0))
+    font, small_font, title_font = fonts[0], fonts[1], fonts[2]
+    panel_w, panel_h = min(820, width - 48), min(500, height - 48)
+    panel = pygame.Rect((width - panel_w) // 2, (height - panel_h) // 2, panel_w, panel_h)
+    pygame.draw.rect(screen, PANEL_BG, panel, border_radius=10)
+    pygame.draw.rect(screen, TEAL, panel, 2, border_radius=10)
+    x, y = panel.x + 22, panel.y + 18
+
+    if record is None:
+        draw_text(screen, title_font, "Auction details", x, y, TEAL)
+        draw_text(screen, font, "No auction messages have been recorded yet.", x, y + 42)
+    else:
+        task_id, epoch = record["task_id"], record["epoch"]
+        priority = record["priority"]
+        priority_label = {1: "low", 2: "medium", 3: "high"}.get(priority, "unknown")
+        draw_text(screen, title_font,
+                  "Task #%d  |  %s priority  |  auction %d" % (task_id, priority_label, epoch), x, y, TEAL)
+        y += 38
+        draw_text(screen, font, "Agents that submitted feasible bids (lower cost wins):", x, y)
+        y += 27
+        bids = sorted(record["bids"].items(), key=lambda item: (item[1], item[0]))
+        if bids:
+            for agent_id, cost in bids:
+                draw_text(screen, small_font, "A%d   bid %.3f" % (agent_id, cost), x + 12, y, TEXT)
+                y += 21
+        else:
+            draw_text(screen, small_font, "No bids recorded for this auction.", x + 12, y, MUTED)
+            y += 21
+
+        bidder_ids = set(record["bids"])
+        no_bid_ids = [agent.agent_id for agent in sim.agents if agent.agent_id not in bidder_ids]
+        if no_bid_ids:
+            names = ", ".join("A%d" % agent_id for agent_id in no_bid_ids)
+            draw_text(screen, small_font, "No bid recorded: " + names, x + 12, y, MUTED)
+            y += 21
+            draw_text(screen, small_font, "This can mean infeasible or no bid message recorded.", x + 12, y, MUTED)
+            y += 25
+
+        accepts = sorted(record["accepts"].items(), key=lambda item: (item[1], item[0]))
+        if len(accepts) == 1:
+            winner_id, winner_cost = accepts[0]
+            draw_text(screen, font, "Winner: A%d (accepted at %.3f)" % (winner_id, winner_cost), x, y, GREEN)
+            y += 24
+            expected = min(bids, key=lambda item: (item[1], item[0])) if bids else None
+            if expected == (winner_id, winner_cost):
+                draw_text(screen, small_font, "Reason: lowest recorded bid; ties go to the lower agent ID.", x, y)
+            else:
+                draw_text(screen, small_font, "Accept differs from recorded bids; agents may have received different messages.", x, y, YELLOW)
+        elif accepts:
+            claims = ", ".join("A%d (%.3f)" % claim for claim in accepts)
+            draw_text(screen, font, "Conflicting accept claims: " + claims, x, y, YELLOW)
+            y += 24
+            draw_text(screen, small_font, "This auction did not produce one consistent winner claim.", x, y, YELLOW)
+        elif bids:
+            draw_text(screen, font, "Winner: pending acceptance", x, y, YELLOW)
+        else:
+            draw_text(screen, font, "Winner: none recorded", x, y, MUTED)
+
+    footer = "Auction %d of %d   |   Left/Right: browse   |   A, Esc, or click: close" % (
+        record_index + 1 if record_count else 0, record_count)
+    draw_text(screen, small_font, footer, panel.x + 22, panel.bottom - 30, MUTED)
+
+
 def draw_banner(screen, text, centre_x, y):
     if text:
         surface = pygame.font.Font(None, 26).render(text, True, BG)
@@ -438,6 +506,7 @@ def draw_help(screen, fonts):
                  "Left-click a vehicle: fail that vehicle", "Right-click a cell: block that road",
                  "Hover over anything: see what it is", "Split screen (S): central dispatcher vs our fleet",
                  "Dispatcher (D): switch the central dispatcher off", "Heartbeats (H): show heartbeat messages in the feed",
+                 "Auction bids (A): inspect bids, accepted winner, and prior auctions",
                  "New map (R), Strategy (TAB), Help (?), Quit (ESC)"]:
         draw_text(screen, font, text, 600, y, TEXT)
         y += 25
@@ -472,6 +541,8 @@ class App:
         self.paused = False
         self.show_heartbeats = False
         self.help_open = show_help
+        self.auction_open = False
+        self.auction_index = 0
         self.banner, self.banner_until = "", 0
         self.accumulator = 0.0
         self.running = True
@@ -501,7 +572,8 @@ class App:
         else:
             dispatcher_label, dispatcher_enabled = "Dispatcher: " + ("ON" if central.online else "OFF"), True
         strategy = self.left_strategy if self.split else self.single_strategy
-        return [[{"action": "help", "label": "? Help", "enabled": True}],
+        return [[{"action": "help", "label": "? Help", "enabled": True},
+                 {"action": "auction", "label": "Auction bids (A)", "enabled": True}],
                 [{"action": "pause", "label": "Resume" if self.paused else "Pause", "enabled": True, "active": self.paused},
                  {"action": "slower", "label": "Slower", "enabled": True},
                  {"action": "faster", "label": "Faster", "enabled": True}],
@@ -522,6 +594,11 @@ class App:
     def act(self, name):
         if name == "help":
             self.help_open = not self.help_open
+        elif name == "auction":
+            self.auction_open = not self.auction_open
+            if self.auction_open:
+                sim = self._auction_sim()
+                self.auction_index = max(0, len(sim.bus.auction_history) - 1) if sim and sim.bus else 0
         elif name == "pause":
             self.paused = not self.paused
         elif name == "faster":
@@ -562,8 +639,12 @@ class App:
 
     KEYS = {pygame.K_SPACE: "pause", pygame.K_UP: "faster", pygame.K_DOWN: "slower", pygame.K_1: "rush",
             pygame.K_2: "storm", pygame.K_3: "block", pygame.K_r: "new_map", pygame.K_TAB: "strategy",
-            pygame.K_s: "split", pygame.K_d: "dispatcher", pygame.K_h: "heartbeats", pygame.K_F1: "help",
+            pygame.K_s: "split", pygame.K_d: "dispatcher", pygame.K_h: "heartbeats", pygame.K_a: "auction", pygame.K_F1: "help",
             pygame.K_QUESTION: "help", pygame.K_SLASH: "help"}
+
+    def _auction_sim(self):
+        """Return the auction run to inspect (the right side in split-screen)."""
+        return next((sim for sim in reversed(self.sims) if sim.bus is not None), None)
 
     def handle_event(self, event):
         if event.type == pygame.QUIT:
@@ -572,6 +653,20 @@ class App:
         if self.help_open and event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
             self.help_open = False                       # any key or click closes the guide
             return
+        if self.auction_open:
+            if event.type == pygame.KEYDOWN:
+                sim = self._auction_sim()
+                count = len(sim.bus.auction_history) if sim and sim.bus else 0
+                if event.key == pygame.K_LEFT and count:
+                    self.auction_index = max(0, self.auction_index - 1)
+                elif event.key == pygame.K_RIGHT and count:
+                    self.auction_index = min(count - 1, self.auction_index + 1)
+                else:
+                    self.auction_open = False
+                return
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.auction_open = False
+                return
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self.act("quit")
@@ -648,6 +743,15 @@ class App:
                     draw_tooltip(screen, lines, mouse, fonts[1])
         if self.help_open:
             draw_help(screen, fonts)
+        elif self.auction_open:
+            sim = self._auction_sim()
+            history = sim.bus.auction_history if sim and sim.bus else []
+            if history:
+                self.auction_index = min(self.auction_index, len(history) - 1)
+                record = history[self.auction_index]
+            else:
+                record = None
+            draw_auction_overlay(screen, sim, record, self.auction_index, len(history), fonts)
         pygame.display.flip()
 
     def run(self, max_frames=None):

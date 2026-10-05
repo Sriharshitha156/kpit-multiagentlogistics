@@ -51,6 +51,17 @@ class TestWindow(unittest.TestCase):
         self.app.handle_event(click(self.button_centre("pause")))
         self.assertFalse(self.app.paused)
 
+    def test_auction_details_open_and_close_from_the_keyboard(self):
+        self.app.act("rush")
+        for _ in range(10):
+            self.app.sims[0].step()
+        self.app.handle_event(key(pygame.K_a, "a"))
+        self.assertTrue(self.app.auction_open)
+        self.assertEqual(self.app.auction_index, len(self.app.sims[0].bus.auction_history) - 1)
+        self.app.draw()
+        self.app.handle_event(key(pygame.K_ESCAPE))
+        self.assertFalse(self.app.auction_open)
+
     def test_rush_hour_button_creates_orders(self):
         before = len(self.app.sims[0].env.tasks)
         self.app.handle_event(click(self.button_centre("rush")))

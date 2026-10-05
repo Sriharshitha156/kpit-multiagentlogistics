@@ -72,6 +72,38 @@ class MessageBus:
         self.messages_lost = 0
         self.sent_by_type = {}
         self.log = deque(maxlen=300)           # recent transmissions, for the live message feed
+        self.auction_history = []              # audit records reconstructed from actual transmissions
+        self._auction_by_key = {}
+
+    def _record_auction_message(self, msg_type, sender_id, payload):
+        """Keep a read-only audit trail of auction requests, bids, and claims."""
+        if msg_type == TASK_REQUEST:
+            task = payload["task"]
+            task_id, epoch = task.task_id, payload["epoch"]
+        elif msg_type == TASK_REASSIGN:
+            task = payload["task"]
+            task_id, epoch = task.task_id, payload["epoch"]
+        elif msg_type in (TASK_BID, TASK_ACCEPT):
+            if "task_id" not in payload or "epoch" not in payload:
+                return
+            task = None
+            task_id, epoch = payload["task_id"], payload["epoch"]
+        else:
+            return
+
+        key = (task_id, epoch)
+        record = self._auction_by_key.get(key)
+        if record is None:
+            record = {"task_id": task_id, "epoch": epoch, "priority": None,
+                      "bids": {}, "accepts": {}}
+            self._auction_by_key[key] = record
+            self.auction_history.append(record)
+        if task is not None:
+            record["priority"] = task.priority
+        if msg_type == TASK_BID:
+            record["bids"][sender_id] = payload["cost"]
+        elif msg_type == TASK_ACCEPT:
+            record["accepts"][sender_id] = payload["cost"]
 
     def set_alive(self, agent_ids):
         """Tell the bus which agents are alive (dead agents receive nothing)."""
@@ -82,6 +114,7 @@ class MessageBus:
         self.messages_sent += 1
         self.sent_by_type[msg_type] = self.sent_by_type.get(msg_type, 0) + 1
         self.log.append((tick, msg_type, sender_id, payload))
+        self._record_auction_message(msg_type, sender_id, payload)
         if receiver_id == BROADCAST:
             receivers = [i for i in self.alive_ids if i != sender_id]
         else:

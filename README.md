@@ -38,6 +38,7 @@ python -m unittest discover -s tests
 
 `SPACE` pause | `UP`/`DOWN` speed | `R` new map | `TAB` switch strategy | `S` split screen\
 `1` rush hour | `2` failure storm | `3` blocked road | `D` dispatcher on/off | `H` heartbeats in feed\
+`A` auction bids (browse with `LEFT`/`RIGHT`, close with `A`, `ESC`, or click)\
 Click a vehicle to fail it | right-click a cell to block it | `ESC` quit
 
 ## Experiments

@@ -40,6 +40,18 @@ class TestAuction(unittest.TestCase):
         self.assertEqual(owners, {expected})             # all five ledgers name the same winner
         self.assertEqual(task.owner_id, expected)
 
+    def test_message_bus_keeps_a_bid_and_winner_audit_record(self):
+        sim = Simulation(seed=1, num_agents=4, strategy="AUCTION")
+        task = sim.new_task()
+        for _ in range(10):
+            sim.step()
+
+        record = sim.bus.auction_history[0]
+        self.assertEqual(record["task_id"], task.task_id)
+        self.assertEqual(record["priority"], task.priority)
+        self.assertTrue(record["bids"])
+        self.assertIn(task.owner_id, record["accepts"])
+
     def test_tie_goes_to_lowest_id(self):
         sim = Simulation(seed=1, num_agents=3, strategy="AUCTION")
         task = sim.new_task()
