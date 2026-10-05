@@ -106,31 +106,46 @@ class Agent:
         return self._length_cache[key]
 
     # ---------- the bid ----------
-    def _remaining_work(self, env):
-        """
-        How far I still have to walk for everything I already hold, and where I will
-        be when I finish it. Distance is None if some leg cannot be reached.
+    def _planned_work(self, task, env):
+        """Estimate the route I would actually follow if I also accepted `task`.
+
+        The active task stays first. Remaining jobs use the same priority/age order
+        as `_start_next_task`. Return total route distance, final position, and the
+        distance travelled before reaching this task's pickup.
         """
         position = self.position
         distance = 0
-        legs = []
+        distance_to_candidate = None
         if self.assigned_task is not None:
-            task = self.assigned_task
             if self.status == GOING_TO_PICKUP:
-                legs.append((position, task.pickup))
-                position = task.pickup
-            legs.append((position, task.destination))
-            position = task.destination
-        for task in self.task_queue:
-            legs.append((position, task.pickup))
-            legs.append((task.pickup, task.destination))
-            position = task.destination
-        for start, goal in legs:
-            length = self.path_length(start, goal, env)
+                length = self.path_length(position, self.assigned_task.pickup, env)
+                if length is None:
+                    return None, position, None
+                distance += length
+                position = self.assigned_task.pickup
+            length = self.path_length(position, self.assigned_task.destination, env)
             if length is None:
-                return None, position
+                return None, position, None
             distance += length
-        return distance, position
+            position = self.assigned_task.destination
+
+        pending = [queued for queued in self.task_queue if queued.task_id != task.task_id]
+        pending.append(task)
+        pending.sort(key=lambda queued: (-queued.priority, queued.created_tick, queued.task_id))
+        for queued in pending:
+            to_pickup = self.path_length(position, queued.pickup, env)
+            if to_pickup is None:
+                return None, position, None
+            if queued.task_id == task.task_id:
+                distance_to_candidate = distance + to_pickup
+            distance += to_pickup
+            to_destination = self.path_length(queued.pickup, queued.destination, env)
+            if to_destination is None:
+                return None, position, None
+            distance += to_destination
+            position = queued.destination
+
+        return distance, position, distance_to_candidate
 
     def compute_bid(self, task, env):
         """
@@ -146,20 +161,19 @@ class Agent:
         if load >= config.MAX_QUEUE:
             return None
 
-        committed_distance, end_position = self._remaining_work(env)
-        to_pickup = self.path_length(end_position, task.pickup, env)
+        planned_distance, end_position, distance_to_pickup = self._planned_work(task, env)
         delivery = self.path_length(task.pickup, task.destination, env)
-        charger_trips = [self.path_length(task.destination, c, env) for c in env.chargers]
+        charger_trips = [self.path_length(end_position, c, env) for c in env.chargers]
         charger_trips = [d for d in charger_trips if d is not None]
-        if committed_distance is None or to_pickup is None or delivery is None or not charger_trips:
+        if planned_distance is None or distance_to_pickup is None or delivery is None or not charger_trips:
             return None                                   # something is unreachable
         back_to_charger = min(charger_trips)
 
-        energy_needed = (committed_distance + to_pickup + delivery + back_to_charger) * config.ENERGY_PER_CELL
+        energy_needed = (planned_distance + back_to_charger) * config.ENERGY_PER_CELL
         if self.battery < energy_needed * (1 + config.SAFETY_MARGIN):
             return None                                   # battery feasibility check failed
 
-        time_until_pickup = (committed_distance + to_pickup) / self.speed
+        time_until_pickup = distance_to_pickup / self.speed
         delivery_time = delivery / self.speed
         cost = (config.W_TIME * (config.PRIORITY_FACTOR[task.priority] * time_until_pickup + delivery_time)
                 + config.W_LOAD * load)

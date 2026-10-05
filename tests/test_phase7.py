@@ -10,7 +10,7 @@ import config
 from communication import BROADCAST, MessageBus, TASK_BID
 from metrics import summarize
 from simulation import Simulation
-from task import COMPLETED
+from task import COMPLETED, TaskInfo
 
 
 class TestAuction(unittest.TestCase):
@@ -48,6 +48,21 @@ class TestAuction(unittest.TestCase):
         for _ in range(10):
             sim.step()
         self.assertEqual(task.owner_id, 1)
+
+    def test_bid_route_uses_the_same_priority_order_as_execution(self):
+        sim = Simulation(seed=1, num_agents=1, strategy="AUCTION")
+        agent = sim.agents[0]
+        agent.position = (0, 0)
+        agent.known_obstacles.clear()
+        agent._length_cache.clear()
+        agent.task_queue = [TaskInfo(1, (1, 0), (2, 0), 1, 0)]
+        urgent = TaskInfo(2, (10, 0), (11, 0), 3, 1)
+
+        total_distance, final_position, distance_to_urgent_pickup = agent._planned_work(urgent, sim.env)
+
+        self.assertEqual(distance_to_urgent_pickup, 10)  # urgent job runs before the queued low-priority job
+        self.assertEqual(total_distance, 22)
+        self.assertEqual(final_position, (2, 0))
 
     def test_low_battery_agent_does_not_win(self):
         sim = Simulation(seed=1, num_agents=2, strategy="AUCTION")
