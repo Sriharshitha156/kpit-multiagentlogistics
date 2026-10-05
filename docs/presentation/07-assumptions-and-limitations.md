@@ -20,6 +20,7 @@ State these plainly if asked what the simulator proves.
 - The parcel location after a carrier failure is approximated from the last heartbeat.
 - Auction decisions can disagree under message loss if agents receive different bids. The UI exposes accept conflicts; consistency under arbitrary loss is not guaranteed.
 - Central baselines have no message-cost model. B2 has immediate failure knowledge; B1 has no recovery.
+- Task cancellation is supported only before assignment through the simulation API. The visual demo has no cancel control, and an assigned delivery cannot currently be withdrawn.
 - Existing saved experiment outputs can be stale relative to newer code changes.
 
 ## Claims to avoid

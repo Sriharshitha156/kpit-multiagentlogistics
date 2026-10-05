@@ -8,8 +8,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
 from communication import Message, TASK_BID
+from metrics import summarize
 from simulation import Simulation
-from task import TaskInfo
+from task import CANCELLED, TaskInfo
 
 
 class TestProjectEdgeCases(unittest.TestCase):
@@ -87,6 +88,35 @@ class TestProjectEdgeCases(unittest.TestCase):
             sim.step()
         self.assertEqual(sim.alive_count(), 0)
         self.assertEqual(sim.failed_count(), 3)
+
+    def test_cancelling_open_auction_removes_order_from_every_vehicle(self):
+        sim = Simulation(seed=10, num_agents=3, strategy="AUCTION")
+        task = sim.new_task()
+        self.assertTrue(sim.cancel_task(task.task_id))
+        self.assertFalse(sim.cancel_task(task.task_id))
+        for _ in range(4):
+            sim.step()
+        self.assertEqual(task.status, CANCELLED)
+        self.assertIsNone(task.owner_id)
+        self.assertTrue(all(a.ledger[task.task_id]["status"] == "CANCELLED" for a in sim.agents))
+        self.assertEqual(summarize(sim)["cancelled"], 1)
+
+    def test_central_dispatchers_ignore_cancelled_orders(self):
+        for strategy in ("B1", "B2"):
+            sim = Simulation(seed=11, num_agents=2, strategy=strategy)
+            task = sim.new_task()
+            self.assertTrue(sim.cancel_task(task.task_id))
+            sim.step()
+            self.assertIsNone(task.owner_id)
+            self.assertEqual(task.status, CANCELLED)
+
+    def test_assigned_task_cannot_be_cancelled(self):
+        sim = Simulation(seed=12, num_agents=2, strategy="B1")
+        task = sim.new_task()
+        sim.step()
+        self.assertIsNotNone(task.owner_id)
+        self.assertFalse(sim.cancel_task(task.task_id))
+        self.assertNotEqual(task.status, CANCELLED)
 
 
 if __name__ == "__main__":

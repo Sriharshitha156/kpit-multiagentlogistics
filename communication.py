@@ -18,6 +18,7 @@ TASK_BID = "TASK_BID"                  # agent -> everyone: "I can do it at this
 TASK_ACCEPT = "TASK_ACCEPT"            # winner -> everyone: "I own this task"
 DELIVERY_COMPLETE = "DELIVERY_COMPLETE"
 TASK_REASSIGN = "TASK_REASSIGN"        # peer announces a new auction epoch for orphaned work
+TASK_CANCEL = "TASK_CANCEL"            # order desk withdraws an unassigned task
 HEARTBEAT = "HEARTBEAT"                # agent reports that it is alive
 AGENT_FAILURE = "AGENT_FAILURE"        # peer reports its failure suspicion
 
@@ -36,6 +37,8 @@ def describe_message(msg_type, sender_id, payload):
         detail = "#%d (epoch %d)" % (payload["task_id"], payload["epoch"])
     elif msg_type == TASK_REASSIGN:
         detail = "#%d epoch %d (%s)" % (payload["task"].task_id, payload["epoch"], payload["reason"])
+    elif msg_type == TASK_CANCEL:
+        detail = "#%d" % payload["task_id"]
     elif msg_type == AGENT_FAILURE:
         detail = "A%d declared dead" % payload["failed_id"]
     elif msg_type == DELIVERY_COMPLETE:

@@ -18,7 +18,7 @@ from agent import CHARGING, DELIVERING, FAILED, GOING_TO_CHARGE, GOING_TO_PICKUP
 from communication import HEARTBEAT, describe_message
 from metrics import summarize
 from simulation import Simulation
-from task import ASSIGNED, COMPLETED, OPEN, PICKED_UP
+from task import ASSIGNED, CANCELLED, COMPLETED, OPEN, PICKED_UP
 
 # ---------- colours ----------
 BG = (10, 26, 43)
@@ -118,7 +118,7 @@ def draw_tasks(screen, sim, view, small_font):
     failed_ids = {a.agent_id for a in sim.agents if a.status == FAILED}
     label_it = view.cell >= 24
     for task in sim.env.tasks:
-        if task.status == COMPLETED:
+        if task.status in (COMPLETED, CANCELLED):
             continue
         orphaned = task.owner_id in failed_ids
         dest = view.center(task.destination)
@@ -202,7 +202,7 @@ def tooltip_for(sim, cell):
                 "Battery %d%%" % round(agent.battery), "Holding %d order(s), delivered %d" % (holding, agent.tasks_completed)]
     failed_ids = {a.agent_id for a in sim.agents if a.status == FAILED}
     for task in sim.env.tasks:
-        if task.status == COMPLETED:
+        if task.status in (COMPLETED, CANCELLED):
             continue
         at_pickup = cell == task.pickup and task.status in (OPEN, ASSIGNED)
         if not (at_pickup or cell == task.destination):

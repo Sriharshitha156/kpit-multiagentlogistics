@@ -4,7 +4,7 @@ We never type in results by hand: everything below is calculated.
 """
 
 from agent import FAILED
-from task import ASSIGNED, COMPLETED, OPEN, PICKED_UP
+from task import ASSIGNED, CANCELLED, COMPLETED, OPEN, PICKED_UP
 
 
 def summarize(sim):
@@ -39,6 +39,7 @@ def summarize(sim):
 
     return {
         "created": len(tasks),
+        "cancelled": sum(1 for t in tasks if t.status == CANCELLED),
         "completed": len(completed),
         "lost": len(lost),
         "in_progress": len(in_progress),

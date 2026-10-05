@@ -6,11 +6,12 @@ and the metrics code use it. Agents only ever receive a TaskInfo: a plain copy
 of the task's description, carried inside messages.
 """
 
-# Task statuses (the lifecycle: OPEN -> ASSIGNED -> PICKED_UP -> COMPLETED)
+# Task statuses (OPEN tasks may be cancelled before assignment.)
 OPEN = "OPEN"
 ASSIGNED = "ASSIGNED"
 PICKED_UP = "PICKED_UP"
 COMPLETED = "COMPLETED"
+CANCELLED = "CANCELLED"
 LOST = "LOST"            # unfinished at the end of a run
 
 # Priorities

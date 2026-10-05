@@ -10,9 +10,10 @@ Depending on config.STRATEGY it runs:
 import config
 from agent import Agent
 from baseline_dispatcher import CentralDispatcherB1, CentralDispatcherB2
-from communication import BROADCAST, DESK, MessageBus, TASK_REQUEST
+from communication import BROADCAST, DESK, MessageBus, TASK_CANCEL, TASK_REQUEST
 from environment import Environment
 from socket_bus import LocalUdpMessageBus
+from task import CANCELLED, OPEN
 
 
 class Simulation:
@@ -68,6 +69,21 @@ class Simulation:
         if self.bus is not None:
             self.bus.send(TASK_REQUEST, DESK, BROADCAST, self.tick, {"task": task.describe(), "epoch": 1})
         return task
+
+    def cancel_task(self, task_id):
+        """Cancel a task only while it is still waiting for an owner.
+
+        Returns False once a task has been assigned, picked up, completed, or
+        otherwise left the OPEN state.
+        """
+        task = self.env.task_by_id.get(task_id)
+        if task is None or task.status != OPEN:
+            return False
+        task.status = CANCELLED
+        if self.bus is not None:
+            self.bus.send(TASK_CANCEL, DESK, BROADCAST, self.tick,
+                          {"task_id": task_id, "epoch": task.epoch})
+        return True
 
     def add_obstacle(self, cell=None):
         """

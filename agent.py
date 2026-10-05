@@ -21,7 +21,7 @@ OWN ledger, raises their epoch and re-auctions them. No leader is involved.
 
 import config
 from communication import (AGENT_FAILURE, BROADCAST, DELIVERY_COMPLETE, HEARTBEAT, TASK_ACCEPT, TASK_BID,
-                           TASK_REASSIGN, TASK_REQUEST)
+                           TASK_CANCEL, TASK_REASSIGN, TASK_REQUEST)
 from pathfinding import astar
 from task import TaskInfo
 
@@ -39,6 +39,7 @@ PROVISIONAL = "PROVISIONAL"    # winner computed, waiting for the winner's TASK_
 ASSIGNED = "ASSIGNED"          # winner confirmed
 NO_BIDS = "NO_BIDS"            # nobody could take it; will be re-auctioned later
 DONE = "DONE"                  # delivered
+CANCELLED = "CANCELLED"        # withdrawn before assignment
 
 
 class Agent:
@@ -239,6 +240,8 @@ class Agent:
                 if entry is not None:
                     entry["status"] = DONE
                 self._drop_task(payload["task_id"])           # someone already delivered it
+            elif message.msg_type == TASK_CANCEL:
+                self._on_cancel(payload)
             elif message.msg_type == HEARTBEAT:
                 self.peer_info[message.sender_id] = payload
             elif message.msg_type == AGENT_FAILURE:
@@ -269,6 +272,20 @@ class Agent:
         entry = self.ledger.get(payload["task_id"])
         if entry is not None and entry["status"] == BIDDING and entry["epoch"] == payload["epoch"]:
             entry["bids"][message.sender_id] = payload["cost"]
+
+    def _on_cancel(self, payload):
+        """Forget an order the desk withdrew before it was assigned."""
+        entry = self.ledger.get(payload["task_id"])
+        if entry is None or payload["epoch"] >= entry["epoch"]:
+            if entry is None:
+                self.ledger[payload["task_id"]] = {
+                    "task": None, "epoch": payload["epoch"], "owner": None, "cost": None,
+                    "status": CANCELLED, "bids": {},
+                }
+            else:
+                entry["status"] = CANCELLED
+                entry["owner"] = None
+                self._drop_task(payload["task_id"])
 
     def _run_auction_timers(self, env, tick):
         """Close auctions whose bid window ended, and restart ones that stalled."""
@@ -319,7 +336,7 @@ class Agent:
         """
         payload = message.payload
         entry = self.ledger.get(payload["task_id"])
-        if entry is None or payload["epoch"] < entry["epoch"]:
+        if entry is None or entry["status"] == CANCELLED or payload["epoch"] < entry["epoch"]:
             return
         claim = (payload["cost"], message.sender_id)
         if payload["epoch"] == entry["epoch"] and entry["owner"] is not None:

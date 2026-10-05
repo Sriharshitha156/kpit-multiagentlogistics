@@ -27,6 +27,10 @@ python main.py --udp --nohelp
 
 In Wireshark, capture on the Npcap Loopback Adapter and use the display filter `udp && ip.addr == 127.0.0.1`. Press `1` to create orders, then look for JSON UDP payloads containing message types such as `TASK_REQUEST`, `TASK_BID`, and `TASK_ACCEPT`. This mode still runs all agents in one process. Configured simulated message loss happens before a datagram is sent, so those intentionally dropped messages will not appear in the capture.
 
+### Cancelling an order (developer demo)
+
+An order can be cancelled while it is still waiting for a vehicle. In Python, call `sim.cancel_task(task_id)`: it returns `True` when the order is cancelled and `False` if the task is missing or has already left the waiting state. In auction mode, the desk broadcasts `TASK_CANCEL` and each vehicle marks that order cancelled in its local ledger. The interactive screen does not currently have a cancel button.
+
 ## Four-minute walkthrough
 
 ### 1. Orient the audience
