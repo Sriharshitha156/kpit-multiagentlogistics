@@ -17,9 +17,14 @@ from environment import Environment
 class Simulation:
     """Holds the environment, agents and (for baselines) the dispatcher."""
 
-    def __init__(self, seed=config.RANDOM_SEED, num_agents=config.NUM_AGENTS, strategy=None):
+    def __init__(self, seed=config.RANDOM_SEED, num_agents=config.NUM_AGENTS, strategy=None,
+                 task_schedule=None):
         self.strategy = strategy or config.STRATEGY
         self.env = Environment(seed)
+        # A schedule is used by paired experiments; normal interactive runs keep
+        # generating requests from the live simulation RNG.
+        self.task_schedule = task_schedule
+        self._scheduled_task_index = 0
         self.tick = 0
         # Only the decentralized strategy needs a network.
         self.bus = MessageBus(seed + 1000) if self.strategy == "AUCTION" else None
@@ -58,6 +63,9 @@ class Simulation:
         Returns the blocked cell, or None if nothing could be blocked.
         """
         protected = {a.position for a in self.agents}
+        if self.task_schedule is not None:
+            for _, pickup, destination, _ in self.task_schedule[self._scheduled_task_index:]:
+                protected.update((pickup, destination))
         for task in self.env.tasks:
             if task.status != "COMPLETED":
                 protected.add(task.pickup)
@@ -82,9 +90,16 @@ class Simulation:
         self._refresh_alive()
 
         # 1. New delivery request?
-        if (self.env.rng.random() < config.TASK_SPAWN_PROBABILITY
-                and self.env.open_task_count() < config.MAX_OPEN_TASKS):
-            self.new_task()
+        if self.task_schedule is None:
+            if (self.env.rng.random() < config.TASK_SPAWN_PROBABILITY
+                    and self.env.open_task_count() < config.MAX_OPEN_TASKS):
+                self.new_task()
+        else:
+            while (self._scheduled_task_index < len(self.task_schedule)
+                   and self.task_schedule[self._scheduled_task_index][0] == self.tick):
+                _, pickup, destination, priority = self.task_schedule[self._scheduled_task_index]
+                self.new_task(pickup, destination, priority)
+                self._scheduled_task_index += 1
 
         # 1b. Road conditions may change.
         if config.OBSTACLE_EVENT_PROBABILITY > 0 and self.env.rng.random() < config.OBSTACLE_EVENT_PROBABILITY:

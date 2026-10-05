@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(ROOT, "experiments"))
 
 import config
 import run_experiments as runner
+from simulation import Simulation
 
 
 class TestRunner(unittest.TestCase):
@@ -30,6 +31,18 @@ class TestRunner(unittest.TestCase):
     def test_every_strategy_sees_the_same_failures(self):
         self.assertEqual(runner.failing_agents(7, 10, 3), runner.failing_agents(7, 10, 3))
         self.assertEqual(len(set(runner.failing_agents(7, 10, 3))), 3)
+
+    def test_task_schedule_is_repeatable_and_shared_across_strategies(self):
+        schedule = runner.build_task_schedule(23, 80, 0.2)
+        self.assertEqual(schedule, runner.build_task_schedule(23, 80, 0.2))
+        task_sets = []
+        for strategy in ("B1", "B2", "AUCTION"):
+            sim = Simulation(seed=23, num_agents=6, strategy=strategy, task_schedule=schedule)
+            for _ in range(80):
+                sim.step()
+            task_sets.append([(t.created_tick, t.pickup, t.destination, t.priority) for t in sim.env.tasks])
+        self.assertEqual(task_sets[0], task_sets[1])
+        self.assertEqual(task_sets[1], task_sets[2])
 
     def test_aggregate_computes_mean_and_std(self):
         rows = [{"experiment": "e", "group": "", "x": "1", "strategy": "B2", "seed": s,

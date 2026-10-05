@@ -36,23 +36,29 @@ These baselines differ in information and failure handling. Explain those differ
 
 ## Existing experiment suites
 
-Run a short smoke-scale suite:
+Run a short paired smoke-scale suite:
 
 ```powershell
-python experiments/run_experiments.py --suite quick
+python experiments/run_experiments.py --suite paired-quick
 ```
 
 Run the broader configured suite:
 
 ```powershell
-python experiments/run_experiments.py --suite main
-python experiments/make_charts.py --suite main
+python experiments/run_experiments.py --suite paired-main
+python experiments/make_charts.py --suite paired-main
 ```
 
-The main suite uses ten seeds, 1,500 ticks per job, and a failure point at tick 300. It varies fleet size (5, 10, 20, 50), task spawn probability, obstacle density, failed-agent count, dispatcher outage, and message loss. It does **not** test 25 or 100 agents, fixed task counts, low-battery stress as a separate scenario, or computation time.
+The paired main suite uses ten seeds, 1,500 ticks per job, and a failure point at tick 300. It varies fleet size (5, 10, 20, 50), task spawn probability, obstacle density, failed-agent count, dispatcher outage, and message loss. It does **not** test 25 or 100 agents, fixed task counts, low-battery stress as a separate scenario, or computation time.
+
+### What “paired requests” means
+
+For one seed and scenario, the runner creates a list of orders in advance: when each order arrives, its pickup, destination, and priority. B1, B2, and AUCTION then receive that same list. In everyday terms, this is like comparing three delivery teams on the same day's orders, instead of giving each team a different day's work. This makes the strategy comparison easier to interpret; vehicles can still take different routes and finish different numbers of orders.
+
+Use the `paired-*` suites for current comparisons. Their separate output folders keep older unpaired results intact. The task arrival schedule is replayed even if a strategy has many jobs waiting, so a paired run can exceed the interactive demo's open-task cap.
 
 ## Reproducibility and fair comparison caveats
 
-Jobs use controlled seeds and preselect the same failed agent IDs across strategies. Initial maps and starts are generated from the same seed. However, separate strategy runs can diverge in later random events as their world states and random-number consumption differ. Do not call every event sequence identical without validating it.
+Paired jobs use controlled seeds, the same precomputed delivery requests, and the same failed agent IDs. Initial maps and starts use the same seed. Separate strategy runs can still diverge in movement, message delivery, and other later random events because their states and random-number consumption differ; only the scheduled requests and selected failures are deliberately matched.
 
 Results in `results/` may predate the current code. Re-run the suite after implementation changes before citing values as evidence for this version. Report number of seeds, tick horizon, settings, variability, and limitations alongside any comparison.

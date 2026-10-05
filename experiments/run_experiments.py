@@ -1,14 +1,14 @@
 """
 run_experiments.py - headless batch experiments (no window).
 
-Every number in the results comes from running the simulator. For each scenario we run
-the three strategies on IDENTICAL random scenarios (same seed, same failures), repeated
-over many seeds, and then report the mean and spread.
+Every number in the results comes from running the simulator. The paired-* suites
+replay the same precomputed delivery requests to each strategy, then report the mean
+and spread across seeds.
 
 Usage (from the project folder):
-    python experiments/run_experiments.py --suite sweep    # failure-timeout vs message-loss sweep (tuning seeds)
-    python experiments/run_experiments.py --suite main     # the main experiments (fresh test seeds)
-    python experiments/run_experiments.py --suite quick    # tiny run to check that everything works
+    python experiments/run_experiments.py --suite paired-sweep  # failure-timeout vs message-loss sweep
+    python experiments/run_experiments.py --suite paired-main   # main paired comparison
+    python experiments/run_experiments.py --suite paired-quick  # tiny paired smoke run
 
 Results are written to results/<suite>/ : raw_runs.csv, summary.csv, settings.json.
 A run can be stopped and restarted: finished runs are skipped.
@@ -81,7 +81,11 @@ def quick_experiments():
 
 SUITES = {"main": (main_experiments, MAIN_SEEDS, 1500),
           "sweep": (sweep_experiments, SWEEP_SEEDS, 1500),
-          "quick": (quick_experiments, QUICK_SEEDS, 500)}
+          "quick": (quick_experiments, QUICK_SEEDS, 500),
+          # New output directories keep old, unpaired CSV results from being reused.
+          "paired-main": (main_experiments, MAIN_SEEDS, 1500),
+          "paired-sweep": (sweep_experiments, SWEEP_SEEDS, 1500),
+          "paired-quick": (quick_experiments, QUICK_SEEDS, 500)}
 
 
 def make_jobs(experiments, seeds):
@@ -103,13 +107,31 @@ def failing_agents(seed, num_agents, count):
     return random.Random(seed * 100 + count).sample(range(1, num_agents + 1), count)
 
 
+def build_task_schedule(seed, ticks, spawn_probability):
+    """Create exogenous task arrivals once so paired strategies get identical demand."""
+    from environment import Environment
+
+    arrivals = random.Random(seed + 99173)
+    template = Environment(seed)
+    schedule = []
+    for tick in range(1, ticks + 1):
+        if arrivals.random() < spawn_probability:
+            task = template.spawn_task(tick)
+            schedule.append((tick, task.pickup, task.destination, task.priority))
+    return schedule
+
+
 def run_job(job, ticks):
     """Run one simulation and return its row of metrics."""
     saved = {k: getattr(config, k) for k in job["overrides"]}
     for key, value in job["overrides"].items():
         setattr(config, key, value)
     try:
-        sim = Simulation(seed=job["seed"], num_agents=job["num_agents"], strategy=job["strategy"])
+        paired = job.get("paired_tasks", False)
+        task_schedule = (build_task_schedule(job["seed"], ticks, config.TASK_SPAWN_PROBABILITY)
+                         if paired else None)
+        sim = Simulation(seed=job["seed"], num_agents=job["num_agents"], strategy=job["strategy"],
+                         task_schedule=task_schedule)
         doomed = failing_agents(job["seed"], job["num_agents"], job["failures"])
         for t in range(ticks):
             if t == FAIL_TICK:
@@ -186,6 +208,9 @@ def main():
     raw_path = os.path.join(out_dir, "raw_runs.csv")
 
     jobs = make_jobs(builder(), seeds)
+    if args.suite.startswith("paired-"):
+        for job in jobs:
+            job["paired_tasks"] = True
     done = {job_key(r) for r in read_rows(raw_path)}
     todo = [j for j in jobs if job_key(j) not in done]
     print("suite=%s  ticks=%d  seeds=%d  runs: %d total, %d already done" % (args.suite, ticks, len(seeds), len(jobs), len(done)))
@@ -193,6 +218,7 @@ def main():
     with open(os.path.join(out_dir, "settings.json"), "w") as f:
         json.dump({"suite": args.suite, "ticks": ticks, "seeds": seeds, "fail_tick": FAIL_TICK,
                    "started": time.strftime("%Y-%m-%d %H:%M:%S"),
+                   "task_schedule": "precomputed and replayed per seed and scenario" if args.suite.startswith("paired-") else "live random arrivals",
                    "config": {k: getattr(config, k) for k in dir(config) if k.isupper() and k != "PRIORITY_FACTOR"}}, f, indent=2)
 
     fields = KEY_FIELDS + METRICS
