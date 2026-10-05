@@ -2,6 +2,10 @@
 
 Use these short guides to prepare the demo or answer technical questions. They describe the current simulator, including its assumptions and limits.
 
+## Roadmap status
+
+The requested Phase 0–16 implementation checklist is complete, including the strict reviewer pass. Phase 15 has 76 automated tests. The original project brief's unimplemented scope is still stated plainly: there are no delivery deadlines or on-time/late metrics, and order cancellation has no GUI control. These are product limitations, not features to claim in a presentation.
+
 1. [Project pitch](01-project-pitch.md) — 30-second and 2-minute explanations.
 2. [Architecture](02-architecture.md) — components, message flow, and where decisions happen.
 3. [Auction and routing](03-auction-and-routing.md) — bid formula, battery feasibility, and A*.

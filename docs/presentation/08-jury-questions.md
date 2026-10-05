@@ -36,7 +36,7 @@ The in-process bus counts generated transmissions and recipient deliveries, and 
 
 ## What proves the approach works?
 
-The code includes 67 automated tests for bidding, winner selection, A*, recovery, UI behavior, UDP message transfer, and experiment repeatability. The paired stress batch has 63 simulator runs (three strategies × seven cases × three seeds), the scale batch has 99 runs, the auction consistency sweep has 30 runs, and the energy batch has 36 runs. The metrics come from simulator state, not hand-entered results. These demonstrate software behavior under the stated assumptions; they do not prove field performance. Report the protocol, seeds, run horizon, and variability.
+The code currently has 76 automated tests for bidding, winner selection, A*, recovery, edge cases, UI behavior, UDP message transfer, and experiment repeatability. The paired stress batch has 63 simulator runs (three strategies × seven cases × three seeds), the scale batch has 99 runs, the auction consistency sweep has 30 runs, and the energy batch has 36 runs. The metrics come from simulator state, not hand-entered results. These demonstrate software behavior under the stated assumptions; they do not prove field performance. Report the protocol, seeds, run horizon, and variability.
 
 ## What is genuinely new here?
 
@@ -53,3 +53,9 @@ Single-process simulated communications, no collision avoidance/congestion, perm
 ## What is the next credible improvement?
 
 If separate-process deployment becomes a requirement, move from the optional localhost demo to isolated agent processes and test packet loss, timing, and recovery there. For the current simulator, the next useful improvement is to model bandwidth or charger capacity if those are central to the claim.
+
+## Strict reviewer verdict
+
+This is a credible, testable teaching prototype for decentralized task allocation. It is not evidence that an auction will outperform a well-informed central dispatcher: paired results show B2 is often at least as strong, and the auction pays extra message and runtime costs. The strongest defensible claim is that agents can coordinate through local bids and recover work in this simulation, with measurable behavior under seeded load and failure scenarios.
+
+Before presenting, regenerate the experiment results from the current commit and state the seed count and run horizon. Do not claim real-city readiness, guaranteed consensus under message loss, deadline performance, collision-safe routing, or production-scale networking. The model has no delivery deadlines, collision or traffic model, or charger capacity limit. Order cancellation is available through the simulation API only before assignment; the GUI has no cancel control.
