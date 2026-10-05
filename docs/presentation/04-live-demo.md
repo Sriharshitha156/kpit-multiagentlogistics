@@ -1,0 +1,61 @@
+# Live demo script
+
+## Start the simulator
+
+From the repository folder in PowerShell:
+
+```powershell
+python -m pip install -r requirements.txt
+python main.py
+```
+
+Start directly in comparison mode with:
+
+```powershell
+python main.py --split
+```
+
+The left side starts with central B2; the right side is the decentralized auction fleet. In split mode, press `TAB` to switch the central baseline between B1 and B2.
+
+## Four-minute walkthrough
+
+### 1. Orient the audience
+
+Point out the grid district, charging stations, vehicles and battery bars, pickup squares, delivery rings, and route lines. Explain that each cell is an abstract road segment; it is not a real city map.
+
+### 2. Create demand and inspect an auction
+
+Press `1` for a rush of orders. Point to the message feed for requests, bids, and accepts. Press `A` to open auction details. Show one task's priority, bids, accepted winner, and tie rule. Use left/right arrows for earlier auctions. Explain that the panel records sends; a missing bid can mean infeasible or not recorded under packet loss.
+
+### 3. Show battery and routing
+
+Point out a battery bar and route line. Explain that battery is used to reject infeasible bids and agents travel to a charger when idle and low on charge. Press `3` to block roads; the system avoids protected cells and the map generator keeps the free map connected.
+
+### 4. Demonstrate failure recovery
+
+Click a moving vehicle to fail it. Its peers wait until heartbeat timeout, suspect the silent vehicle, and start a new auction for unfinished work. The message feed and red orphaned task make the sequence visible. Recovery is not instantaneous; the current timeout is 15 silent ticks plus message/tick timing.
+
+### 5. Compare strategies
+
+Press `S` for split view. Explain B1 as nearest idle without a battery feasibility rule; B2 as a central dispatcher using the cost/battery rule with immediate failure knowledge; and AUCTION as agents deciding from messages. Treat this as a visual demonstration, not a statistically controlled result.
+
+## Useful controls
+
+| Key/action | What it does |
+|---|---|
+| `SPACE` | Pause/resume |
+| `UP` / `DOWN` | Change simulation speed |
+| `1` | Add a rush-hour burst |
+| `2` | Fail several vehicles, leaving one alive |
+| `3` | Block several roads |
+| `A` | Open auction details; arrows browse history |
+| `S` | Toggle split-screen comparison |
+| `TAB` | Switch allocation strategy (or B1/B2 in split view) |
+| `D` | Toggle central dispatcher when a central strategy is active |
+| Left-click vehicle | Fail it |
+| Right-click grid cell | Try to block the cell |
+| `ESC` | Quit |
+
+## Practice note
+
+Try the flow once before presenting. The chosen vehicle and exact timings depend on the current simulation state and seed; describe the behavior rather than promising a particular agent ID will win.
