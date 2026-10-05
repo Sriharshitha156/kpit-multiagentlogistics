@@ -37,6 +37,18 @@ PANELS = {
                       ("avg_detection_latency", "Failure detection time (ticks)", ["AUCTION"]),
                       ("avg_delivery", "Average delivery time (ticks)", ["AUCTION"]),
                       ("completion_rate", "Completion rate", ["AUCTION"])],
+    "scale_agents": [("completion_rate", "Completion rate", ALL),
+                     ("compute_seconds", "Simulation time per run (seconds)", ALL),
+                     ("avg_reassign_time", "Average reassignment time (ticks)", SMART),
+                     ("msgs_per_completed", "Messages per completed task", ["AUCTION"])],
+    "scale_tasks": [("completion_rate", "Completion rate", ALL),
+                    ("compute_seconds", "Simulation time per run (seconds)", ALL),
+                    ("avg_delivery", "Average delivery time (ticks)", ALL),
+                    ("waiting", "Orders still waiting at the end", ALL)],
+    "scale_obstacles": [("completion_rate", "Completion rate", ALL),
+                        ("compute_seconds", "Simulation time per run (seconds)", ALL),
+                        ("total_distance", "Total distance (cells)", ALL),
+                        ("battery_failures", "Vehicles that ran out of battery", ALL)],
 }
 
 
@@ -105,7 +117,8 @@ def xlabel(experiment):
     return {"fleet_size": "Number of vehicles", "task_load": "Task spawn probability per tick",
             "obstacles": "Obstacle density", "failures": "Vehicles failed at tick 300",
             "dispatcher_outage": "Dispatcher outage at tick 300", "message_loss": "Message loss probability",
-            "timeout_sweep": "Failure timeout (ticks)"}[experiment]
+            "timeout_sweep": "Failure timeout (ticks)", "scale_agents": "Number of vehicles",
+            "scale_tasks": "Fixed number of orders", "scale_obstacles": "Obstacle density"}[experiment]
 
 
 def main():

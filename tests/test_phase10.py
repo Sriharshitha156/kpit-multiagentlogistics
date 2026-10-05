@@ -44,6 +44,20 @@ class TestRunner(unittest.TestCase):
         self.assertEqual(task_sets[0], task_sets[1])
         self.assertEqual(task_sets[1], task_sets[2])
 
+    def test_fixed_count_schedule_creates_requested_number_of_orders(self):
+        schedule = runner.build_task_schedule(31, 40, 0.0, task_count=12)
+        self.assertEqual(len(schedule), 12)
+        sim = Simulation(seed=31, num_agents=5, strategy="B1", task_schedule=schedule)
+        for _ in range(40):
+            sim.step()
+        self.assertEqual(len(sim.env.tasks), 12)
+
+    def test_scale_run_records_measured_compute_time(self):
+        job = self.job()
+        job.update({"paired_tasks": True, "track_runtime": True, "task_count": 3})
+        row = runner.run_job(job, 30)
+        self.assertGreater(row["compute_seconds"], 0)
+
     def test_aggregate_computes_mean_and_std(self):
         rows = [{"experiment": "e", "group": "", "x": "1", "strategy": "B2", "seed": s,
                  **{m: "" for m in runner.METRICS}} for s in (1, 2, 3)]

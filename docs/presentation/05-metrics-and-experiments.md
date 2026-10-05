@@ -24,7 +24,7 @@
 | Messages delivered | Recipient copies delivered by the bus | Broadcast counts once per recipient; lost messages excluded |
 | Messages per completed task | Sent transmissions divided by completed deliveries | Undefined when nothing completed |
 
-On-time/late percentage, deadlines, battery consumption, computation time, and recovery distance above a no-failure counterfactual are **not** currently reported.
+On-time/late percentage, deadlines, battery consumption, and recovery distance against a no-failure counterfactual are **not** currently reported. Computation time is reported only by the `paired-scale` suite.
 
 ## Baselines
 
@@ -51,11 +51,22 @@ python experiments/make_charts.py --suite paired-main
 
 The paired main suite uses ten seeds, 1,500 ticks per job, and a failure point at tick 300. It varies fleet size (5, 10, 20, 50), task spawn probability, obstacle density, failed-agent count, dispatcher outage, and message loss. It does **not** test 25 or 100 agents, fixed task counts, low-battery stress as a separate scenario, or computation time.
 
+### Scalability check
+
+Run the dedicated, smaller scalability suite and generate its charts:
+
+```powershell
+python experiments/run_experiments.py --suite paired-scale
+python experiments/make_charts.py --suite paired-scale
+```
+
+This suite uses three seeds and 600 ticks per run. It checks 5, 10, 25, 50, and 100 agents with 50 scheduled orders; 25, 50, and 100 scheduled orders with 25 agents; and obstacle densities of 0%, 10%, and 20% with 25 agents. Each case has a seeded failure load (about 10% of the fleet for the agent-count experiment; two agents in the other cases). The reported `compute_seconds` is wall-clock time for simulator setup, execution, and metric calculation on the machine running it. Treat that timing as machine dependent, and do not describe the three-seed run as proof of real-world scalability.
+
 ### What “paired requests” means
 
 For one seed and scenario, the runner creates a list of orders in advance: when each order arrives, its pickup, destination, and priority. B1, B2, and AUCTION then receive that same list. In everyday terms, this is like comparing three delivery teams on the same day's orders, instead of giving each team a different day's work. This makes the strategy comparison easier to interpret; vehicles can still take different routes and finish different numbers of orders.
 
-Use the `paired-*` suites for current comparisons. Their separate output folders keep older unpaired results intact. The task arrival schedule is replayed even if a strategy has many jobs waiting, so a paired run can exceed the interactive demo's open-task cap.
+Use the `paired-*` suites for current comparisons. Their separate output folders keep older unpaired results intact. The task arrival schedule is replayed even if a strategy has many jobs waiting, so a paired run can exceed the interactive demo's open-task cap. The scalability suite uses exact order counts, distributed across the run by its seeded schedule.
 
 ## Reproducibility and fair comparison caveats
 
