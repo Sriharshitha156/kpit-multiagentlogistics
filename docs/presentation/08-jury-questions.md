@@ -8,6 +8,8 @@ In auction mode, each agent computes its own bid, maintains a local ledger, and 
 
 Nearest distance alone ignores battery and existing workload. The auction uses route ETA and workload in its cost, and rejects agents whose battery cannot cover planned work plus a charger trip. Whether that improves outcomes must be shown by controlled experiments; it is not guaranteed for every scenario.
 
+In the recent three-seed stress run, high demand averaged 49% completion for B1, 96% for B2, and 95% for AUCTION. Under normal demand, all were about 97% complete, while AUCTION's average delivery time was longer than B2's (26.3 vs 22.9 ticks). The evidence supports battery/workload-aware allocation over the naive nearest baseline in some cases; it does not show that decentralized AUCTION is better than smart central B2.
+
 ## How is battery considered?
 
 Battery is a feasibility gate with a configurable safety margin. It is not directly added as a continuous term in the bid score. A low-battery idle agent heads to a charger. Charging stations have unlimited capacity in this model.
@@ -26,7 +28,7 @@ For each reassigning event, we record the failed/replacement agent IDs, failure 
 
 ## What happens with 100 agents?
 
-The repository does not currently contain a 100-agent experiment result. The configured main suite reaches 50 agents and does not measure per-run computation time. We should run and profile 100-agent cases before making a scalability claim.
+The paired scalability batch tested 100 agents, 50 scheduled orders, 10 seeded failures, and 600 ticks over three seeds. All strategies averaged 48.7 completed orders out of 50 (97.3%). On the machine used for that batch, average simulator time per run was about 0.86 seconds for B1, 3.13 for B2, and 7.12 for AUCTION; AUCTION sent about 23,864 messages per run. These are simulation and host-specific measurements, not evidence for a real 100-vehicle fleet or larger scales.
 
 ## What if communication overhead is high?
 
@@ -34,7 +36,11 @@ The bus counts generated transmissions and recipient deliveries, and supports co
 
 ## What proves the approach works?
 
-The code includes deterministic tests for bidding, winner selection, A*, recovery, UI behavior, and experiment repeatability, plus multi-seed experiment tooling. Those show software behavior under tested assumptions; they do not prove field performance. Re-run experiments after code changes and report the protocol, seeds, run horizon, and variability.
+The code includes 63 automated tests for bidding, winner selection, A*, recovery, UI behavior, and experiment repeatability. The paired stress batch has 63 simulator runs (three strategies × seven cases × three seeds), and the scale batch has 99 runs (three strategies × eleven settings × three seeds). The metrics come from simulator state, not hand-entered results. These demonstrate software behavior under the stated assumptions; they do not prove field performance. Report the protocol, seeds, run horizon, and variability.
+
+## What is genuinely new here?
+
+The project brings together agent-local bidding, battery feasibility, priority-aware task queues, heartbeat-based recovery, and inspectable message/audit views in one teaching simulator. The auction and A* methods are standard techniques; the defensible contribution is the integrated, reproducible demonstration, not a claim of a new allocation algorithm.
 
 ## Which parts are assumptions?
 
@@ -46,4 +52,4 @@ Single-process simulated communications, no collision avoidance/congestion, perm
 
 ## What is the next credible improvement?
 
-First make paired experiments replay exactly the same task arrivals, road events, and failures for each strategy. Then validate metrics and auction agreement under message loss before adding larger scalability claims or real networking.
+Measure how often agents disagree about auction winners as message loss rises, and add bandwidth or charger-capacity limits if those are central to the intended claim. Consider sockets only if a real networked deployment is a project requirement; the current simulator intentionally uses a deterministic in-process bus.

@@ -26,7 +26,7 @@ State these plainly if asked what the simulator proves.
 
 - “Works in a real city” or “tested on real EV data.”
 - “Always beats a central dispatcher.”
-- “Handles 100 vehicles efficiently” without a 100-agent run and computation-time measurements.
+- “Scales efficiently to real fleets” based on the single-host 100-agent simulation. Current evidence is three seeds, 50 orders, 10 failures, and 600 ticks; it reports runtime and message counts only for that setup.
 - “Cloud failure has been tested” as a deployed cloud outage; only the simulated dispatcher can be toggled offline.
 - “The agents communicate over a real network.”
 - “Deliveries meet a 90-minute deadline” or “on-time rate” because deadlines are not implemented.
