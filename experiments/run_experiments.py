@@ -101,7 +101,9 @@ SUITES = {"main": (main_experiments, MAIN_SEEDS, 1500),
           "paired-main": (main_experiments, MAIN_SEEDS, 1500),
           "paired-sweep": (sweep_experiments, SWEEP_SEEDS, 1500),
           "paired-quick": (quick_experiments, QUICK_SEEDS, 500),
-          "paired-scale": (scale_experiments, SCALE_SEEDS, 600)}
+          "paired-scale": (scale_experiments, SCALE_SEEDS, 600),
+          # Fresh folder for a clean, reviewable result set, separate from prior runs.
+          "paired-scale-clean": (scale_experiments, SCALE_SEEDS, 600)}
 
 
 def make_jobs(experiments, seeds):
@@ -238,7 +240,7 @@ def main():
     if args.suite.startswith("paired-"):
         for job in jobs:
             job["paired_tasks"] = True
-            if args.suite == "paired-scale":
+            if args.suite.startswith("paired-scale"):
                 job["track_runtime"] = True
     done = {job_key(r) for r in read_rows(raw_path)}
     todo = [j for j in jobs if job_key(j) not in done]
@@ -248,10 +250,10 @@ def main():
         json.dump({"suite": args.suite, "ticks": ticks, "seeds": seeds, "fail_tick": FAIL_TICK,
                    "started": time.strftime("%Y-%m-%d %H:%M:%S"),
                    "task_schedule": "precomputed and replayed per seed and scenario" if args.suite.startswith("paired-") else "live random arrivals",
-                   "fixed_task_counts": args.suite == "paired-scale",
+                   "fixed_task_counts": args.suite.startswith("paired-scale"),
                    "config": {k: getattr(config, k) for k in dir(config) if k.isupper() and k != "PRIORITY_FACTOR"}}, f, indent=2)
 
-    report_metrics = METRICS + (["compute_seconds"] if args.suite == "paired-scale" else [])
+    report_metrics = METRICS + (["compute_seconds"] if args.suite.startswith("paired-scale") else [])
     fields = KEY_FIELDS + report_metrics
     new_file = not os.path.exists(raw_path)
     start = time.time()
